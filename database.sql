@@ -23,5 +23,39 @@ CREATE TABLE credenziali (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP        
 );
+CREATE Table EncryptionKeys (
+    key_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT(11),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE,
+    encryption_key VARBINARY(512) NOT NULL,
+    algorithm VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE Table devices (
+    device_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT(11),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE,
+    device_name VARCHAR(255) NOT NULL,
+    device_type VARCHAR(100),
+    last_used TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE synclogs (
+    sync_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT(11),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE,
+    device_id INT(11),
+    FOREIGN KEY (device_id) REFERENCES devices(device_id)
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE,
+    sync_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) NOT NULL
+);
 
 
