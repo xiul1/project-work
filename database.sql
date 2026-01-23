@@ -11,7 +11,7 @@ CREATE TABLE users(
 );
 CREATE TABLE credenziali (
     credential_id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT(11),
+    user_id INT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id)
         ON DELETE CASCADE 
         ON UPDATE CASCADE,
@@ -57,5 +57,6 @@ CREATE TABLE synclogs (
     sync_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(50) NOT NULL
 );
+
 
 
