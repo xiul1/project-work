@@ -6,18 +6,18 @@ def test_connection():
     try:
         session = get_session()
 
-        print("✅ Connessione al database riuscita")
+        print("Connessione al database riuscita")
 
         result = session.execute(text("SHOW TABLES"))
-        print("📋 Tabelle trovate:")
+        print("Tabelle trovate:")
         for row in result:
             print(" -", row[0])
 
         session.close()
 
     except Exception as e:
-        print("❌ Errore di connessione:")
+        print("Errore di connessione:")
         print(e)
 
 if __name__ == "__main__":
-    test_connection()
+    test_connection() 
