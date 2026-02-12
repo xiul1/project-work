@@ -5,7 +5,6 @@ CREATE TABLE users(
     username VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash_master VARCHAR(255) NOT NULL,
-    salt VARCHAR(255) NOT NULL,
     last_login TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,6 +56,15 @@ CREATE TABLE synclogs (
     sync_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(50) NOT NULL
 );
-
+CREATE TABLE email_verification_tokens (
+    token_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+ALTER TABLE users ADD email_verified TINYINT(1) DEFAULT 0;
 
 
