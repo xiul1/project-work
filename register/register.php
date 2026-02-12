@@ -31,7 +31,7 @@ function sendVerificationEmail($email, $token) {
 
         $mail->isHTML(true);
         $mail->Subject = 'Verifica la tua email';
-        $verification_link = "http://localhost/project-work/register.php?verify=$token";
+        $verification_link = "http://localhost/project-work/register/register.php?verify=$token";
         $mail->Body = "Ciao,<br><br>Per favore verifica la tua email cliccando il link seguente:<br><a href='$verification_link'>$verification_link</a><br><br>Se non hai richiesto questa registrazione, ignora questa email.";
 
         $mail->send();
