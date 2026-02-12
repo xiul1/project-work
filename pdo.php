@@ -1,11 +1,9 @@
 <?php
-// db_connect.php
-
 try {
     $hostname = "localhost";
-    $dbname   = "my_xiuli";
-    $user     = "xiuli";
-    $pass     = "";
+    $dbname   = "KeyManager";  // il tuo database
+    $user     = "root";        // XAMPP default
+    $pass     = "";            // XAMPP root password vuota
 
     $pdo = new PDO(
         "mysql:host=$hostname;dbname=$dbname;charset=utf8mb4",
