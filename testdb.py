@@ -13,7 +13,7 @@ def test_connection():
         for row in result:
             print(" -", row[0])
 
-        session.close()
+        session.close() 
 
     except Exception as e:
         print("Errore di connessione:")
