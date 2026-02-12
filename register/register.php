@@ -19,14 +19,14 @@ function sendVerificationEmail($email, $token) {
     try {
         // Configurazione SMTP per XAMPP (modifica con i tuoi dati SMTP)
         $mail->isSMTP();
-        $mail->Host = 'smtp.example.com';        // Imposta il server SMTP
+        $mail->Host = 'smtp.gmail.com';        // Imposta il server SMTP
         $mail->SMTPAuth = true;
-        $mail->Username = 'tuoindirizzo@example.com';   // SMTP username
-        $mail->Password = 'tuapassword';                 // SMTP password
+        $mail->Username = 'chriszhang238@gmail.com';   // SMTP username
+        $mail->Password = 'itrw sydw yfpd vtds';                 // SMTP password
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = 587;
 
-        $mail->setFrom('tuoindirizzo@example.com', 'Il Tuo Sito');
+        $mail->setFrom('chriszhang238@gmail.com', 'Il Tuo Sito');
         $mail->addAddress($email);
 
         $mail->isHTML(true);
@@ -58,8 +58,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } else {
 
         // Controllo email già registrata
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = :email");
+        $stmt->bindValue(":email", $email);
+        $stmt->execute();
+        
 
         if ($stmt->rowCount() > 0) {
             $message = "Email già registrata.";
@@ -71,9 +73,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             // Inserimento utente
             $stmt = $pdo->prepare("
                 INSERT INTO users (username, email, password_hash_master, email_verified)
-                VALUES (?, ?, ?, 0)
+                VALUES (:username, :email, :password_hash_master, 0)
             ");
-            $stmt->execute([$username, $email, $password_hash]);
+            $stmt->bindValue(":username", $username);
+            $stmt->bindValue(":email", $email);
+            $stmt->bindValue(":password_hash_master", $password_hash);
+            $stmt->execute();
 
             $user_id = $pdo->lastInsertId();
 
@@ -83,9 +88,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $stmt = $pdo->prepare("
                 INSERT INTO email_verification_tokens (user_id, token, expires_at)
-                VALUES (?, ?, ?)
+                VALUES (:user_id, :token, :expires_at)
             ");
-            $stmt->execute([$user_id, $token, $expires]);
+            $stmt->bindValue(":user_id", $user_id);
+            $stmt->bindValue(":token", $token);
+            $stmt->bindValue(":expires_at", $expires);
+            $stmt->execute();
 
             // Invio email con PHPMailer
             if (sendVerificationEmail($email, $token)) {

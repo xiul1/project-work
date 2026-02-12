@@ -1,6 +1,6 @@
 # test_db.py
 from sqlalchemy import text
-from database import engine, get_session
+from login.database import engine, get_session
 
 def test_connection():
     try:
