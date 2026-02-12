@@ -3,97 +3,110 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
 from tkinter import messagebox
-import webbrowser          # 新增：用于打开浏览器
+import webbrowser          # Used to open the web browser
 import os
 
-# ---------------------------- 数据库配置 ----------------------------
+# ---------------------------- Database Configuration ----------------------------
 DB_USER = "root"
 DB_PASSWORD = ""
 DB_HOST = "127.0.0.1"
 DB_NAME = "KeyManager"
 
+# Create the database URL for SQLAlchemy
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
 engine = create_engine(DATABASE_URL, echo=False)
 Session = sessionmaker(bind=engine)
 
-# ---------------------------- 登录验证函数 ----------------------------
+# ---------------------------- Login Validation Function ----------------------------
 def attempt_login():
+    """
+    Attempt to log in the user by verifying the email and password against the database.
+    Shows appropriate message boxes for errors or success.
+    """
     email = email_entry.get().strip()
     password = pass_entry.get().strip()
 
+    # Check if both fields are filled
     if not email or not password:
-        messagebox.showwarning("注意", "请填写所有字段")
+        messagebox.showwarning("Warning", "Please fill in all fields")
         return
 
     session = Session()
     try:
+        # Query the user with the given email
         result = session.execute(
             text("SELECT * FROM users WHERE email = :email"),
             {"email": email}
         ).fetchone()
 
         if not result:
-            messagebox.showerror("错误", "用户不存在")
+            messagebox.showerror("Error", "User does not exist")
             return
 
+        # Check if the email has been verified
         if result.email_verified == 0:
-            messagebox.showwarning("警告", "邮箱未验证")
+            messagebox.showwarning("Warning", "Email not verified")
             return
 
+        # Verify the password using bcrypt
         stored_hash = result.password_hash_master.encode()
         if bcrypt.checkpw(password.encode(), stored_hash):
-            messagebox.showinfo("欢迎", f"登录成功！欢迎 {result.username}")
+            messagebox.showinfo("Welcome", f"Login successful! Welcome {result.username}")
         else:
-            messagebox.showerror("错误", "密码错误")
+            messagebox.showerror("Error", "Incorrect password")
 
     except Exception as e:
-        messagebox.showerror("连接错误", f"数据库连接失败: {e}")
+        messagebox.showerror("Connection Error", f"Failed to connect to the database: {e}")
     finally:
         session.close()
 
-# ---------------------------- 苹果科技感登录界面 ----------------------------
+# ---------------------------- Apple-style Tech Login GUI ----------------------------
+# Set the appearance mode to follow the system theme (light/dark)
 ctk.set_appearance_mode("system")
+# Set the color theme to blue
 ctk.set_default_color_theme("blue")
 
+# Create the main application window
 root = ctk.CTk()
-root.title("KeyManager · 登录")
+root.title("KeyManager · Login")
 root.geometry("380x480")
 root.resizable(False, False)
 
-# 主框架
+# Main frame container with transparent background
 main_frame = ctk.CTkFrame(root, fg_color="transparent")
 main_frame.pack(pady=40, padx=30, fill="both", expand=True)
 
-# 图标
+# Icon label with lock emoji
 logo_label = ctk.CTkLabel(
     main_frame,
     text="🔐",
     font=ctk.CTkFont(size=48, weight="bold"),
-    text_color=("#2B2B2B", "#E0E0E0")
+    text_color=("#2B2B2B", "#E0E0E0")  # Dark mode and light mode colors
 )
 logo_label.pack(pady=(0, 10))
 
-# 欢迎文字
+# Welcome text label
 welcome_label = ctk.CTkLabel(
     main_frame,
-    text="欢迎回来",
+    text="Welcome Back",
     font=ctk.CTkFont(size=24, weight="bold"),
     text_color=("#1E1E1E", "#F5F5F5")
 )
 welcome_label.pack(pady=(0, 5))
 
+# Subtitle text
 sub_label = ctk.CTkLabel(
     main_frame,
-    text="使用您的账号继续",
+    text="Continue with your account",
     font=ctk.CTkFont(size=13),
     text_color=("gray40", "gray70")
 )
 sub_label.pack(pady=(0, 25))
 
-# 邮箱输入框
+# Email entry input field
 email_entry = ctk.CTkEntry(
     main_frame,
-    placeholder_text="电子邮箱",
+    placeholder_text="Email",
     width=280,
     height=45,
     corner_radius=12,
@@ -102,10 +115,10 @@ email_entry = ctk.CTkEntry(
 )
 email_entry.pack(pady=(0, 15))
 
-# 密码输入框
+# Password entry input field with hidden characters
 pass_entry = ctk.CTkEntry(
     main_frame,
-    placeholder_text="密码",
+    placeholder_text="Password",
     width=280,
     height=45,
     corner_radius=12,
@@ -115,10 +128,10 @@ pass_entry = ctk.CTkEntry(
 )
 pass_entry.pack(pady=(0, 25))
 
-# 登录按钮
+# Login button to trigger the login attempt
 login_btn = ctk.CTkButton(
     main_frame,
-    text="登录",
+    text="Login",
     width=280,
     height=45,
     corner_radius=12,
@@ -130,25 +143,25 @@ login_btn = ctk.CTkButton(
 )
 login_btn.pack(pady=(0, 20))
 
-# 辅助功能行
+# Bottom frame for auxiliary options
 bottom_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
 bottom_frame.pack(pady=(10, 0))
 
-# 忘记密码（仍使用弹窗提示）
+# "Forgot Password?" label that shows an info popup when clicked
 forget_btn = ctk.CTkLabel(
     bottom_frame,
-    text="忘记密码?",
+    text="Forgot Password?",
     font=ctk.CTkFont(size=13, underline=True),
     text_color=("#007AFF", "#6AB0FF"),
     cursor="hand2"
 )
 forget_btn.pack(side="left", padx=(0, 20))
-forget_btn.bind("<Button-1>", lambda e: messagebox.showinfo("提示", "请联系管理员重置密码"))
+forget_btn.bind("<Button-1>", lambda e: messagebox.showinfo("Info", "Please contact the administrator to reset your password"))
 
-# 创建账户 —— 现在会打开您的 register.php
+# "Create Account" label that opens the register page in a browser when clicked
 register_btn = ctk.CTkLabel(
     bottom_frame,
-    text="创建账户",
+    text="Create Account",
     font=ctk.CTkFont(size=13, underline=True),
     text_color=("#007AFF", "#6AB0FF"),
     cursor="hand2"
@@ -156,13 +169,14 @@ register_btn = ctk.CTkLabel(
 register_btn.pack(side="left")
 register_btn.bind("<Button-1>", lambda e: webbrowser.open("http://localhost/project-work/register/register.php"))
 
-# 脚注
+# Footer label at the bottom of the main frame
 footer_label = ctk.CTkLabel(
     main_frame,
-    text="KeyManager  ·  安全登录",
+    text="KeyManager  ·  Secure Login",
     font=ctk.CTkFont(size=11),
     text_color=("gray50", "gray60")
 )
 footer_label.pack(side="bottom", pady=(20, 0))
 
+# Start the GUI event loop
 root.mainloop()
