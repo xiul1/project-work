@@ -9,7 +9,7 @@ import os
 # ---------------------------- Database Configuration ----------------------------
 DB_USER = "root"
 DB_PASSWORD = ""
-DB_HOST = "127.0.0.1"
+DB_HOST = "localhost"
 DB_NAME = "KeyManager"
 
 # Create the database URL for SQLAlchemy
@@ -60,7 +60,7 @@ def attempt_login():
     finally:
         session.close()
 
-# ---------------------------- Apple-style Tech Login GUI ----------------------------
+# ---------------------------- LOGIN GUI ----------------------------
 # Set the appearance mode to follow the system theme (light/dark)
 ctk.set_appearance_mode("system")
 # Set the color theme to blue
@@ -79,7 +79,7 @@ main_frame.pack(pady=40, padx=30, fill="both", expand=True)
 # Icon label with lock emoji
 logo_label = ctk.CTkLabel(
     main_frame,
-    text="🔐",
+    text="KEYMANAGER",
     font=ctk.CTkFont(size=48, weight="bold"),
     text_color=("#2B2B2B", "#E0E0E0")  # Dark mode and light mode colors
 )
