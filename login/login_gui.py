@@ -1,7 +1,7 @@
 import bcrypt
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-import customtkinter as ctk
+import customtkinter as ctk 
 from tkinter import messagebox
 import webbrowser          # Used to open the web browser
 import os

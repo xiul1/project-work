@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+        
         {
             "name": "Python Debugger: Python File",
             "type": "debugpy",
@@ -8,5 +9,16 @@
             "program": "${file}",
             "python": "/usr/bin/python3"
         }
+        ,{
+    "name": "Python: Run Module",
+    "type": "debugpy",
+    "request": "launch",
+    "module": "login.login_gui",
+    "cwd": "${workspaceFolder}",
+    "console": "integratedTerminal"
+    }
+        
     ]
+    
+
 }
