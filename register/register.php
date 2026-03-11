@@ -112,20 +112,23 @@ if (isset($_GET["verify"])) {
 
     $stmt = $pdo->prepare("
         SELECT * FROM email_verification_tokens 
-        WHERE token = ?
+        WHERE token = :token
     ");
-    $stmt->execute([$token]);
+    $stmt->bindValue(":token",$token);
+    $stmt->execute();
     $record = $stmt->fetch();
 
     if ($record) {
         if (strtotime($record['expires_at']) >= time()) {
             // Aggiorna la colonna email_verified
-            $stmt = $pdo->prepare("UPDATE users SET email_verified = 1 WHERE id = ?");
-            $stmt->execute([$record['user_id']]);
+            $stmt = $pdo->prepare("UPDATE users SET email_verified = 1 WHERE id = :id");
+            $stmt->bindValue(":id",$$record['user_id']);
+            $stmt->execute();
 
             // Cancella il token
-            $stmt = $pdo->prepare("DELETE FROM email_verification_tokens WHERE token = ?");
-            $stmt->execute([$token]);
+            $stmt = $pdo->prepare("DELETE FROM email_verification_tokens WHERE token = :token");
+                $stmt->bindValue(":token",$token);
+                $stmt->execute();
 
             $message = "Email verificata con successo!";
         } else {
