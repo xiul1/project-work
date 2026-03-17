@@ -122,7 +122,7 @@ if (isset($_GET["verify"])) {
         if (strtotime($record['expires_at']) >= time()) {
             // Aggiorna la colonna email_verified
             $stmt = $pdo->prepare("UPDATE users SET email_verified = 1 WHERE id = :id");
-            $stmt->bindValue(":id",$$record['user_id']);
+            $stmt->bindValue(":id",$record['user_id']);
             $stmt->execute();
 
             // Cancella il token
