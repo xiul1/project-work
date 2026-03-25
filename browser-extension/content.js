@@ -1,5 +1,32 @@
 const KM_OVERLAY_ID = "km-autofill-overlay";
 let kmOverlayElement = null;
+const KM_USERNAME_HINTS = [
+  "user",
+  "username",
+  "login",
+  "email",
+  "mail",
+  "account",
+  "userid",
+  "user_id",
+  "utente"
+];
+const KM_EXCLUDED_INPUT_HINTS = [
+  "otp",
+  "pin",
+  "totp",
+  "2fa",
+  "one-time-code",
+  "onetime",
+  "passcode",
+  "verification",
+  "verify",
+  "securitycode",
+  "authcode",
+  "smscode",
+  "captcha",
+  "token"
+];
 
 function kmNormalizeHost(value) {
   const raw = String(value || "").trim().toLowerCase();
@@ -83,6 +110,60 @@ function kmIsEditableInput(element) {
   return ["text", "email", "password", "search", "tel", "url"].includes(type);
 }
 
+function kmCollectInputHints(element) {
+  const autocomplete = element.getAttribute("autocomplete") || "";
+  const placeholder = element.getAttribute("placeholder") || "";
+  const ariaLabel = element.getAttribute("aria-label") || "";
+  const testId = element.getAttribute("data-testid") || "";
+  const className = typeof element.className === "string" ? element.className : "";
+
+  return [
+    element.id || "",
+    element.name || "",
+    autocomplete,
+    placeholder,
+    ariaLabel,
+    testId,
+    className
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function kmHasAnyHint(hints, terms) {
+  return terms.some((term) => hints.includes(term));
+}
+
+function kmIsUsernameLikeInput(element) {
+  if (!kmIsEditableInput(element)) {
+    return false;
+  }
+
+  const type = (element.type || "text").toLowerCase();
+  if (!["text", "email", "search", "tel", "url"].includes(type)) {
+    return false;
+  }
+
+  const autocomplete = (element.getAttribute("autocomplete") || "").trim().toLowerCase();
+  if (autocomplete === "one-time-code") {
+    return false;
+  }
+  if (autocomplete === "username" || autocomplete === "email") {
+    return true;
+  }
+
+  const hints = kmCollectInputHints(element);
+  if (!hints) {
+    return false;
+  }
+
+  if (kmHasAnyHint(hints, KM_EXCLUDED_INPUT_HINTS)) {
+    return false;
+  }
+
+  return kmHasAnyHint(hints, KM_USERNAME_HINTS);
+}
+
 function kmFindPasswordField(anchor) {
   const scope = anchor.form || document;
   const candidates = Array.from(scope.querySelectorAll("input[type='password']"));
@@ -99,13 +180,14 @@ function kmFindUsernameField(anchor, passwordField) {
   const scope = anchor.form || document;
   const candidates = Array.from(scope.querySelectorAll("input[type='text'], input[type='email'], input:not([type])"))
     .filter(kmIsVisible)
-    .filter((field) => !field.disabled && !field.readOnly);
+    .filter((field) => !field.disabled && !field.readOnly)
+    .filter(kmIsUsernameLikeInput);
 
   if (candidates.length === 0) {
-    return null;
+    return kmIsUsernameLikeInput(anchor) ? anchor : null;
   }
 
-  if (anchor.name === "text" || anchor.type === "email") {
+  if (kmIsUsernameLikeInput(anchor)) {
     return anchor;
   }
 
@@ -257,6 +339,12 @@ async function kmHandleInputFocus(event) {
   const target = event.target;
 
   if (!kmIsEditableInput(target)) {
+    kmHideOverlay();
+    return;
+  }
+
+  if (!kmIsUsernameLikeInput(target)) {
+    kmHideOverlay();
     return;
   }
 
