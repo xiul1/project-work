@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "KeyManager Autofill",
+  "version": "0.1.0",
+  "description": "Mostra suggerimenti autofill quando selezioni campi login.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "activeTab",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://localhost/project-work/*",
+    "http://127.0.0.1/project-work/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "KeyManager Autofill",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
