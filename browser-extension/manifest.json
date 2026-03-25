@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KeyManager Autofill",
-  "version": "0.1.0",
+  "version": "0.1.9",
   "description": "Mostra suggerimenti autofill quando selezioni campi login.",
   "permissions": [
     "storage",

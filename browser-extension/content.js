@@ -105,7 +105,7 @@ function kmFindUsernameField(anchor, passwordField) {
     return null;
   }
 
-  if (anchor.type === "text" || anchor.type === "email") {
+  if (anchor.name === "text" || anchor.type === "email") {
     return anchor;
   }
 
@@ -189,9 +189,8 @@ function kmCreateOverlay(anchor, credentials) {
 
     const service = credential.service_name || "Servizio";
     const username = credential.username || "";
-    const matchType = credential.match_type === "exact_host" ? "host esatto" : "dominio";
 
-    row.textContent = service + " | " + username + " | " + matchType;
+    row.textContent = service + " | " + username;
     row.addEventListener("mouseenter", () => {
       row.style.background = "#eef5ff";
     });
