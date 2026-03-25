@@ -1,0 +1,101 @@
+* {
+  box-sizing: border-box;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+body {
+  margin: 0;
+  width: 360px;
+  background: #f4f7fb;
+  color: #1f2a37;
+}
+
+.wrap {
+  padding: 12px;
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #d9e1ea;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  margin: 7px 0 4px;
+}
+
+input {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid #c5d0db;
+  border-radius: 6px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #155eef;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+button:hover {
+  background: #0f4bcc;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.list li {
+  border: 1px solid #dce4ee;
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #fbfdff;
+}
+
+.list .meta {
+  font-size: 12px;
+  color: #3b4a5a;
+  margin-bottom: 6px;
+}
+
+.message {
+  margin: 0;
+  min-height: 16px;
+  font-size: 12px;
+  color: #9a3412;
+}
+
+.small {
+  font-size: 12px;
+  color: #41566b;
+  margin: 8px 0 0;
+}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KeyManager Autofill</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="wrap">
+    <h1>KeyManager</h1>
+
+    <section class="card">
+      <h2>Sincronizzazione</h2>
+      <p id="statusText">Auto-sync attiva.</p>
+      <div class="row">
+        <button id="syncBtn" type="button">Sincronizza ora</button>
+        <button id="clearBtn" type="button">Svuota cache</button>
+      </div>
+      <p class="small">Credenziali in cache: <strong id="cacheCount">0</strong></p>
+      <p class="small">Ultima sync: <span id="lastSync">mai</span></p>
+    </section>
+
+    <section class="card">
+      <h2>Sito corrente</h2>
+      <p id="domainText">-</p>
+      <p class="small">Clicca un campo username/password nella pagina per vedere i suggerimenti.</p>
+      <button id="refreshBtn" type="button">Aggiorna stato</button>
+    </section>
+
+    <p id="messageText" class="message"></p>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

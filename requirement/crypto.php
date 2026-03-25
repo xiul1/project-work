@@ -2,15 +2,17 @@
 
 require_once __DIR__ . "/pdo.php";
 
-/**
- * Restituisce la chiave di cifratura dell'utente.
- * Se non esiste e $createIfMissing = true, la crea automaticamente.
- */
-function getUserEncryptionKey($userId, $createIfMissing) {
+const CRYPTO_V2_PREFIX = "v2:";
+const CRYPTO_V2_CIPHER = "aes-256-gcm";
+const CRYPTO_V2_NONCE_LENGTH = 12;
+const CRYPTO_V2_TAG_LENGTH = 16;
+const CRYPTO_LEGACY_CIPHER = "AES-256-CBC";
+
+function getUserEncryptionRecord($userId, $createIfMissing) {
     global $pdo;
 
     $stmt = $pdo->prepare("
-        SELECT encryption_key
+        SELECT encryption_key, algorithm
         FROM EncryptionKeys
         WHERE user_id = :user_id
         ORDER BY created_at DESC
@@ -21,8 +23,23 @@ function getUserEncryptionKey($userId, $createIfMissing) {
 
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($row && !empty($row["encryption_key"])) {
-        return $row["encryption_key"];
+    if ($row) {
+        $key = $row["encryption_key"] ?? null;
+
+        if (is_resource($key)) {
+            $key = stream_get_contents($key);
+        }
+
+        if (is_string($key) && $key !== "") {
+            $algorithm = $row["algorithm"] ?? CRYPTO_LEGACY_CIPHER;
+
+            return [
+                "key" => $key,
+                "algorithm" => is_string($algorithm) && $algorithm !== ""
+                    ? $algorithm
+                    : CRYPTO_LEGACY_CIPHER
+            ];
+        }
     }
 
     if ($createIfMissing) {
@@ -32,14 +49,21 @@ function getUserEncryptionKey($userId, $createIfMissing) {
     return false;
 }
 
-/**
- * Crea una nuova chiave AES-256 per l'utente e la salva nel database.
- */
+function getUserEncryptionKey($userId, $createIfMissing) {
+    $record = getUserEncryptionRecord($userId, $createIfMissing);
+
+    if ($record === false) {
+        return false;
+    }
+
+    return $record["key"];
+}
+
 function createUserEncryptionKey($userId) {
     global $pdo;
 
-    $key = random_bytes(32); // 256 bit
-    $algorithm = "AES-256-CBC";
+    $key = random_bytes(32);
+    $algorithm = CRYPTO_LEGACY_CIPHER;
 
     $stmt = $pdo->prepare("
         INSERT INTO EncryptionKeys (user_id, encryption_key, algorithm)
@@ -50,101 +74,112 @@ function createUserEncryptionKey($userId) {
     $stmt->bindValue(":algorithm", $algorithm, PDO::PARAM_STR);
     $stmt->execute();
 
-    return $key;
+    return [
+        "key" => $key,
+        "algorithm" => $algorithm
+    ];
 }
 
-/**
- * Cifra una password usando la chiave dell'utente.
- * Restituisce una stringa base64 da salvare nel DB.
- */
 function encryptUserPassword($userId, $plainPassword) {
-    global $pdo;
+    $record = getUserEncryptionRecord($userId, true);
 
-    $key = getUserEncryptionKey($userId, true);
-
-    if ($key === false) {
+    if ($record === false) {
         return false;
     }
 
-    $stmt = $pdo->prepare("
-        SELECT algorithm
-        FROM EncryptionKeys
-        WHERE user_id = :user_id
-        ORDER BY created_at DESC
-        LIMIT 1
-    ");
-    $stmt->bindValue(":user_id", $userId, PDO::PARAM_INT);
-    $stmt->execute();
+    $nonce = random_bytes(CRYPTO_V2_NONCE_LENGTH);
+    $tag = "";
 
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    $algorithm = $row ? $row["algorithm"] : "AES-256-CBC";
-
-    $ivLength = openssl_cipher_iv_length($algorithm);
-    $iv = random_bytes($ivLength);
-
-    $encrypted = openssl_encrypt(
-        $plainPassword,
-        $algorithm,
-        $key,
+    $ciphertext = openssl_encrypt(
+        (string) $plainPassword,
+        CRYPTO_V2_CIPHER,
+        $record["key"],
         OPENSSL_RAW_DATA,
-        $iv
+        $nonce,
+        $tag,
+        "",
+        CRYPTO_V2_TAG_LENGTH
     );
 
-    if ($encrypted === false) {
+    if ($ciphertext === false || !is_string($tag) || strlen($tag) !== CRYPTO_V2_TAG_LENGTH) {
         return false;
     }
 
-    // Salviamo IV + ciphertext in base64
-    return base64_encode($iv . $encrypted);
+    return CRYPTO_V2_PREFIX . base64_encode($nonce . $tag . $ciphertext);
 }
 
-/**
- * Decifra una password salvata nel DB.
- */
 function decryptUserPassword($userId, $encryptedPassword) {
-    global $pdo;
+    $record = getUserEncryptionRecord($userId, false);
 
-    $key = getUserEncryptionKey($userId, false);
-
-    if ($key === false) {
+    if ($record === false) {
         return false;
     }
 
-    $stmt = $pdo->prepare("
-        SELECT algorithm
-        FROM EncryptionKeys
-        WHERE user_id = :user_id
-        ORDER BY created_at DESC
-        LIMIT 1
-    ");
-    $stmt->bindValue(":user_id", $userId, PDO::PARAM_INT);
-    $stmt->execute();
+    if (isEncryptedPasswordV2($encryptedPassword)) {
+        return decryptV2Password(
+            $record["key"],
+            substr($encryptedPassword, strlen(CRYPTO_V2_PREFIX))
+        );
+    }
 
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    $algorithm = $row ? $row["algorithm"] : "AES-256-CBC";
+    return decryptLegacyPassword($record["key"], $record["algorithm"], $encryptedPassword);
+}
 
-    $decoded = base64_decode($encryptedPassword, true);
+function isEncryptedPasswordV2($encryptedPassword) {
+    return is_string($encryptedPassword) &&
+        strncmp($encryptedPassword, CRYPTO_V2_PREFIX, strlen(CRYPTO_V2_PREFIX)) === 0;
+}
+
+function decryptV2Password($key, $encodedPayload) {
+    if (!is_string($encodedPayload) || $encodedPayload === "") {
+        return false;
+    }
+
+    $decoded = base64_decode($encodedPayload, true);
+
+    if ($decoded === false || strlen($decoded) <= (CRYPTO_V2_NONCE_LENGTH + CRYPTO_V2_TAG_LENGTH)) {
+        return false;
+    }
+
+    $nonce = substr($decoded, 0, CRYPTO_V2_NONCE_LENGTH);
+    $tag = substr($decoded, CRYPTO_V2_NONCE_LENGTH, CRYPTO_V2_TAG_LENGTH);
+    $ciphertext = substr($decoded, CRYPTO_V2_NONCE_LENGTH + CRYPTO_V2_TAG_LENGTH);
+
+    return openssl_decrypt(
+        $ciphertext,
+        CRYPTO_V2_CIPHER,
+        $key,
+        OPENSSL_RAW_DATA,
+        $nonce,
+        $tag
+    );
+}
+
+function decryptLegacyPassword($key, $algorithm, $encryptedPassword) {
+    $cipher = is_string($algorithm) && $algorithm !== ""
+        ? $algorithm
+        : CRYPTO_LEGACY_CIPHER;
+
+    $decoded = base64_decode((string) $encryptedPassword, true);
 
     if ($decoded === false) {
         return false;
     }
 
-    $ivLength = openssl_cipher_iv_length($algorithm);
+    $ivLength = openssl_cipher_iv_length($cipher);
 
-    if (strlen($decoded) <= $ivLength) {
+    if (!is_int($ivLength) || $ivLength <= 0 || strlen($decoded) <= $ivLength) {
         return false;
     }
 
     $iv = substr($decoded, 0, $ivLength);
     $ciphertext = substr($decoded, $ivLength);
 
-    $decrypted = openssl_decrypt(
+    return openssl_decrypt(
         $ciphertext,
-        $algorithm,
+        $cipher,
         $key,
         OPENSSL_RAW_DATA,
         $iv
     );
-
-    return $decrypted;
 }
