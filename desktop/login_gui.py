@@ -167,7 +167,7 @@ register_btn = ctk.CTkLabel(
     cursor="hand2"
 )
 register_btn.pack(side="left")
-register_btn.bind("<Button-1>", lambda e: webbrowser.open("http://localhost/project-work/register/register.php"))
+register_btn.bind("<Button-1>", lambda e: webbrowser.open("http://localhost/project-work/auth/register.php"))
 
 # Footer label at the bottom of the main frame
 footer_label = ctk.CTkLabel(
