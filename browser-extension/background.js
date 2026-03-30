@@ -1,3 +1,5 @@
+importScripts("shared.js");
+
 const KM_SYNC_ALARM = "km_auto_sync";
 const KM_SYNC_PERIOD_MINUTES = 30;
 const KM_DASHBOARD_URL = "http://localhost/project-work/dashboard/main.php";
@@ -6,66 +8,12 @@ const KM_DASHBOARD_PATTERNS = [
   "http://127.0.0.1/project-work/dashboard/*"
 ];
 
-function storageGet(keys) {
-  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
-}
-
-function storageSet(payload) {
-  return new Promise((resolve) => chrome.storage.local.set(payload, resolve));
-}
-
-function tabsQuery(queryInfo) {
-  return new Promise((resolve) => chrome.tabs.query(queryInfo, resolve));
-}
-
 function tabsCreate(createProperties) {
   return new Promise((resolve) => chrome.tabs.create(createProperties, resolve));
 }
 
 function tabsRemove(tabId) {
   return new Promise((resolve) => chrome.tabs.remove(tabId, () => resolve()));
-}
-
-function tabsSendMessage(tabId, payload) {
-  return new Promise((resolve) => {
-    chrome.tabs.sendMessage(tabId, payload, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve({
-          success: false,
-          message: chrome.runtime.lastError.message
-        });
-        return;
-      }
-
-      resolve(response || { success: false, message: "Nessuna risposta dalla scheda" });
-    });
-  });
-}
-
-function injectContentScript(tabId) {
-  return new Promise((resolve) => {
-    chrome.scripting.executeScript(
-      {
-        target: { tabId },
-        files: ["content.js"]
-      },
-      () => {
-        if (chrome.runtime.lastError) {
-          resolve({
-            success: false,
-            message: chrome.runtime.lastError.message
-          });
-          return;
-        }
-
-        resolve({ success: true });
-      }
-    );
-  });
-}
-
-function isDashboardTabUrl(url) {
-  return /\/project-work\/dashboard\/main\.php/i.test(String(url || ""));
 }
 
 function waitTabLoaded(tabId, timeoutMs = 12000) {
@@ -157,7 +105,7 @@ async function runSyncInternal(allowTempTab) {
   const dashboardTabs = await tabsQuery({ url: KM_DASHBOARD_PATTERNS });
 
   if (dashboardTabs.length > 0) {
-    tab = dashboardTabs.find((t) => isDashboardTabUrl(t.url)) || dashboardTabs[0];
+    tab = dashboardTabs.find((t) => isDashboardUrl(t.url)) || dashboardTabs[0];
   }
 
   if (!tab && allowTempTab) {

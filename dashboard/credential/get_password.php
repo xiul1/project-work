@@ -9,12 +9,7 @@ header("Content-Type: application/json");
 require "../../requirement/pdo.php";
 require "../../requirement/crypto.php";
 require "../../requirement/security.php";
-
-function jsonResponse($statusCode, $payload) {
-    http_response_code($statusCode);
-    echo json_encode($payload);
-    exit();
-}
+require "../../requirement/helpers.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     jsonResponse(405, [

@@ -105,7 +105,7 @@ function kmFindUsernameField(anchor, passwordField) {
     return null;
   }
 
-  if (anchor.name === "text" || anchor.type === "email") {
+  if (anchor.type === "text" || anchor.type === "email") {
     return anchor;
   }
 
