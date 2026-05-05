@@ -4,3 +4,6 @@ __pycache__/
 .DS_Store
 browser-extension.pem
 browser-extension.crx
+node_modules/
+# Credenziali SMTP — non tracciare in git
+requirement/mail_config.php

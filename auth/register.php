@@ -1,39 +1,18 @@
 <?php
 require "../requirement/pdo.php";
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-require '../lib/PHPMailer/src/PHPMailer.php';
-require '../lib/PHPMailer/src/SMTP.php';
-require '../lib/PHPMailer/src/Exception.php';
+require "../requirement/mail_config.php";
 
 $message = "";
 
 function sendVerificationEmail($email, $token) {
-    $mail = new PHPMailer(true);
-    try {
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';
-        $mail->SMTPAuth = true;
-        $mail->Username = 'chriszhang238@gmail.com';
-        $mail->Password = 'itrw sydw yfpd vtds';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
+    $verification_link = "http://localhost/project-work/auth/register.php?verify=$token";
 
-        $mail->setFrom('chriszhang238@gmail.com', 'Il Tuo Sito');
-        $mail->addAddress($email);
+    $subject = "Verifica la tua email - KeyManager";
+    $body    = "Ciao,<br><br>Per favore verifica la tua email cliccando il link seguente:<br>"
+             . "<a href='$verification_link'>$verification_link</a><br><br>"
+             . "Se non hai richiesto questa registrazione, ignora questa email.";
 
-        $mail->isHTML(true);
-        $mail->Subject = 'Verifica la tua email';
-        $verification_link = "http://localhost/project-work/auth/register.php?verify=$token";
-        $mail->Body = "Ciao,<br><br>Per favore verifica la tua email cliccando il link seguente:<br><a href='$verification_link'>$verification_link</a><br><br>Se non hai richiesto questa registrazione, ignora questa email.";
-
-        $mail->send();
-        return true;
-    } catch (Exception $e) {
-        return false;
-    }
+    return sendMail($email, $subject, $body);
 }
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {

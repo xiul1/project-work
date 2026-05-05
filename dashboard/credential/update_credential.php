@@ -7,6 +7,7 @@ require "../../requirement/pdo.php";
 require "../../requirement/crypto.php";
 require "../../requirement/security.php";
 require "../../requirement/helpers.php";
+require "../../requirement/logger.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     jsonResponse(405, [
@@ -116,6 +117,7 @@ try {
     }
 
     if ($stmt->rowCount() > 0) {
+        logActivity($userId, "credential_update", "Modificata credenziale: $service");
         jsonResponse(200, [
             "success" => true,
             "message" => "Credenziale aggiornata correttamente"

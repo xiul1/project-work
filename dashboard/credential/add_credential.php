@@ -6,6 +6,7 @@ require "../../requirement/pdo.php";
 require "../../requirement/crypto.php";
 require "../../requirement/security.php";
 require "../../requirement/helpers.php";
+require "../../requirement/logger.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     jsonResponse(405, [
@@ -82,10 +83,13 @@ try {
         ":notes" => $notes !== "" ? $notes : null
     ]);
 
+    $newId = (int) $pdo->lastInsertId();
+    logActivity($userId, "credential_add", "Aggiunta credenziale: $service");
+
     jsonResponse(200, [
         "success" => true,
         "message" => "Credenziale aggiunta correttamente",
-        "id" => (int) $pdo->lastInsertId()
+        "id" => $newId
     ]);
 } catch (PDOException $e) {
     jsonResponse(500, [

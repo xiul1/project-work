@@ -99,3 +99,52 @@ button:hover {
   color: #41566b;
   margin: 8px 0 0;
 }
+
+/* Nasconde elementi — mostrati via JS */
+.hidden {
+  display: none !important;
+}
+
+/* Card centrata per la vista "non loggato" */
+.card--center {
+  text-align: center;
+  padding: 20px 14px;
+}
+
+.icon-lock {
+  font-size: 32px;
+  margin: 0 0 8px;
+}
+
+.msg-login {
+  font-size: 13px;
+  color: #41566b;
+  margin: 0 0 14px;
+}
+
+/* Pulsante principale (usato in vista non loggato) */
+.btn-primary {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+}
+
+/* Pulsante testo per "Apri Dashboard" */
+.btn-link {
+  background: transparent;
+  color: #155eef;
+  border: 1px solid #155eef;
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.btn-link:hover {
+  background: #eef4ff;
+}
+
+/* Riga allineata a destra (per il pulsante Dashboard) */
+.row--right {
+  justify-content: flex-end;
+  margin-top: 0;
+  margin-bottom: 6px;
+}

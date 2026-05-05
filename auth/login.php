@@ -1,42 +1,25 @@
 <?php
 require "../requirement/pdo.php";
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-require '../lib/PHPMailer/src/PHPMailer.php';
-require '../lib/PHPMailer/src/SMTP.php';
-require '../lib/PHPMailer/src/Exception.php';
+require "../requirement/mail_config.php";
+require "../requirement/logger.php";
 
 $message = "";
 
+// Mostra un messaggio se l'utente è stato disconnesso per inattività
+if (isset($_GET["timeout"])) {
+    $message = "Sessione scaduta per inattività. Effettua nuovamente il login.";
+}
+
 function sendResetPasswordEmail($email, $token) {
-    $mail = new PHPMailer(true);
+    $reset_link = "http://localhost/project-work/auth/reset_password.php?token=$token";
 
-    try {
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';
-        $mail->SMTPAuth = true;
-        $mail->Username = 'chriszhang238@gmail.com';
-        $mail->Password = 'itrw sydw yfpd vtds';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
+    $subject = "Reset Password - KeyManager";
+    $body    = "Ciao,<br><br>Hai richiesto il reset della password.<br><br>"
+             . "Clicca il link seguente per impostare una nuova password:<br>"
+             . "<a href='$reset_link'>$reset_link</a><br><br>"
+             . "Se non hai richiesto questa operazione puoi ignorare questa email.";
 
-        $mail->setFrom('chriszhang238@gmail.com', 'Il Tuo Sito');
-        $mail->addAddress($email);
-
-        $mail->isHTML(true);
-        $mail->Subject = 'Reset Password';
-
-        $reset_link = "http://localhost/project-work/auth/reset_password.php?token=$token";
-
-        $mail->Body = "Ciao,<br><br>Hai richiesto il reset della password.<br><br>Clicca il link seguente per impostare una nuova password:<br><a href='$reset_link'>$reset_link</a><br><br>Se non hai richiesto questa operazione puoi ignorare questa email.";
-
-        $mail->send();
-        return true;
-    } catch (Exception $e) {
-        return false;
-    }
+    return sendMail($email, $subject, $body);
 }
 
 $forgot = isset($_GET["forgot"]);
@@ -63,8 +46,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$forgot) {
             $message = "Email non verificata.";
         } elseif (password_verify($password, $user["password_hash_master"])) {
             session_start();
+            // Rigenera l'ID di sessione per prevenire session fixation
+            session_regenerate_id(true);
             $_SESSION["user_id"] = $user["id"];
             $_SESSION["username"] = $user["username"];
+            $_SESSION["last_activity"] = time();
+            // Registra il login nel log attività
+            logActivity($user["id"], "login", "Login effettuato");
             header("Location: ../dashboard/main.php");
             exit();
         } else {

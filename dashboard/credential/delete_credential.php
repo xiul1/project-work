@@ -5,6 +5,7 @@ header("Content-Type: application/json");
 require "../../requirement/pdo.php";
 require "../../requirement/security.php";
 require "../../requirement/helpers.php";
+require "../../requirement/logger.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     jsonResponse(405, [
@@ -50,6 +51,7 @@ try {
     ]);
 
     if ($stmt->rowCount() > 0) {
+        logActivity($userId, "credential_delete", "Eliminata credenziale ID: $id");
         jsonResponse(200, [
             "success" => true,
             "message" => "Credenziale eliminata correttamente"
