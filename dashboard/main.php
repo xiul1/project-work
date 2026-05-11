@@ -28,205 +28,327 @@ $credentials = $stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KeyManager — Dashboard</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
 
+<?php
+$username = $_SESSION["username"] ?? "User";
+$avatarLetter = strtoupper(substr($username, 0, 1));
+$totalCreds = count($credentials);
+?>
+
 <div id="globalMessage"></div>
 
-<!-- Barra superiore con titolo, username e logout -->
-<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #ccc; margin-bottom:12px;">
-    <h1 style="margin:0;">KeyManager</h1>
-    <div>
-        Ciao, <strong><?php echo htmlspecialchars($_SESSION["username"] ?? "Utente"); ?></strong>
-        &nbsp;|&nbsp;
-        <a href="../auth/logout.php">Esci</a>
-        &nbsp;|&nbsp;
-        <a href="settings.php">Impostazioni</a>
-        &nbsp;|&nbsp;
-        <a href="activity_log.php">Log attività</a>
+<div class="app-shell">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <a href="main.php" class="topbar-logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      <span><span class="logo-key">Key</span>Manager</span>
+    </a>
+    <div class="topbar-search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="searchInput" placeholder="Search credentials..." oninput="filterCredentials()">
     </div>
+    <div class="topbar-actions">
+      <a href="settings.php" class="btn-icon" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </a>
+      <div class="avatar" title="<?php echo htmlspecialchars($username); ?>"><?php echo $avatarLetter; ?></div>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <div class="app-content">
+
+    <div class="app-main">
+
+      <!-- Quick Actions -->
+      <div>
+        <div class="quick-actions">
+          <div class="action-card" onclick="openAddModal()">
+            <div class="action-card-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </div>
+            <div>
+              <h3>Add Credential</h3>
+              <p>Store new login</p>
+            </div>
+          </div>
+          <div class="action-card" onclick="openGenerateModal()">
+            <div class="action-card-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            </div>
+            <div>
+              <h3>Generate Password</h3>
+              <p>Create strong keys</p>
+            </div>
+          </div>
+          <div class="action-card" onclick="exportCredentials('csv')">
+            <div class="action-card-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div>
+              <h3>Export</h3>
+              <p>Download your vault</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Credentials -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span class="section-title" style="margin-bottom:0;">Recent Credentials</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="openImportModal()">Import CSV</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportCredentials('json')">Export JSON</button>
+          </div>
+        </div>
+        <div class="credential-list" id="credentialsTableBody">
+          <?php foreach($credentials as $cred):
+            $initial = strtoupper(substr($cred["service_name"], 0, 1));
+            $colors = ['#4A9FD8','#30A46C','#E5484D','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+            $color = $colors[crc32($cred["service_name"]) % count($colors)];
+          ?>
+          <div class="credential-row"
+            data-id="<?php echo $cred["credential_id"]; ?>"
+            data-service="<?php echo htmlspecialchars($cred["service_name"], ENT_QUOTES); ?>"
+            data-username="<?php echo htmlspecialchars($cred["username"], ENT_QUOTES); ?>"
+            data-url="<?php echo htmlspecialchars($cred["url"] ?? "", ENT_QUOTES); ?>"
+            data-notes="<?php echo htmlspecialchars($cred["notes"] ?? "", ENT_QUOTES); ?>"
+          >
+            <div class="cred-avatar" style="background:<?php echo $color; ?>;"><?php echo htmlspecialchars($initial); ?></div>
+            <div class="cred-info">
+              <div class="cred-service"><?php echo htmlspecialchars($cred["service_name"]); ?></div>
+              <div class="cred-username"><?php echo htmlspecialchars($cred["username"]); ?></div>
+            </div>
+            <div class="cred-actions">
+              <button class="btn-icon" onclick="copyUsernameFromRow(this.closest('.credential-row'))" title="Copy username">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              </button>
+              <button class="btn-icon" onclick="openCredentialModal(this.closest('.credential-row'), 'view')" title="More options">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+              </button>
+            </div>
+          </div>
+          <?php endforeach; ?>
+          <?php if (empty($credentials)): ?>
+          <div style="padding:32px;text-align:center;color:var(--fg-muted);font-size:13px;">
+            No credentials yet. Add your first one above.
+          </div>
+          <?php endif; ?>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Vault Summary Sidebar -->
+    <aside class="app-sidebar">
+      <div class="sidebar-card">
+        <h3>Vault Summary</h3>
+        <div class="vault-stat-row">
+          <span>Total Credentials</span>
+          <span><?php echo $totalCreds; ?></span>
+        </div>
+        <div class="vault-stat-row">
+          <span>Last Sync</span>
+          <span style="font-size:12px;color:var(--fg-muted);">Just now</span>
+        </div>
+
+        <div class="sidebar-section-title" style="margin-top:16px;">Quick Links</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <a href="activity_log.php" class="settings-nav-item" style="padding:6px 8px;font-size:12px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Activity Log
+          </a>
+          <a href="settings.php" class="settings-nav-item" style="padding:6px 8px;font-size:12px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            Settings
+          </a>
+          <a href="../auth/logout.php" class="settings-nav-item" style="padding:6px 8px;font-size:12px;color:var(--danger);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sign Out
+          </a>
+        </div>
+      </div>
+
+      <!-- Autofill toggle -->
+      <div class="sidebar-card">
+        <h3>Extension</h3>
+        <div class="settings-row" style="padding:0;border:none;">
+          <div class="settings-row-info">
+            <h3 style="font-size:13px;">Autofill</h3>
+            <p style="font-size:11px;" id="settingsMessage"></p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="autofillToggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </aside>
+
+  </div>
 </div>
 
-<h2>Aggiungi credenziale</h2>
-<button type="button" onclick="openAddModal()">Nuova credenziale</button>
-
-<hr>
-
-<h2>Le tue credenziali</h2>
-
-<!-- Pulsanti di esportazione e importazione -->
-<div style="margin-bottom:10px;">
-    <button type="button" onclick="exportCredentials('csv')">Esporta CSV</button>
-    <button type="button" onclick="exportCredentials('json')">Esporta JSON</button>
-    <button type="button" onclick="openImportModal()">Importa CSV</button>
+<!-- ADD MODAL -->
+<div id="addModal" class="modal-backdrop hidden">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>New Credential</h2>
+      <button class="btn-icon" onclick="closeAddModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="addCredentialForm" class="modal-body">
+      <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
+      <div>
+        <label class="field-label">Service</label>
+        <input type="text" name="service_name" class="field-input" placeholder="e.g. Google, GitHub" required>
+      </div>
+      <div>
+        <label class="field-label">Username / Email</label>
+        <input type="text" name="username" class="field-input" placeholder="your@email.com" required>
+      </div>
+      <div>
+        <label class="field-label">Password</label>
+        <div class="field-row">
+          <input type="password" name="password" id="addPassword" class="field-input" required
+            oninput="updateStrengthIndicator(this.value, 'addPasswordStrength')">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="fillGeneratedPassword('addPassword','addPasswordStrength')">Generate</button>
+        </div>
+        <span id="addPasswordStrength" style="font-size:12px;color:var(--fg-muted);margin-top:4px;display:block;"></span>
+      </div>
+      <div>
+        <label class="field-label">URL (optional)</label>
+        <input type="text" name="url" class="field-input" placeholder="https://...">
+      </div>
+      <div>
+        <label class="field-label">Notes (optional)</label>
+        <textarea name="notes" class="field-input"></textarea>
+      </div>
+    </form>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('addCredentialForm').requestSubmit()">Save</button>
+    </div>
+  </div>
 </div>
 
-<!-- Campo di ricerca: filtra le righe della tabella in tempo reale -->
-<input
-    type="text"
-    id="searchInput"
-    placeholder="Cerca per servizio, username o URL..."
-    oninput="filterCredentials()"
-    style="width:100%; max-width:400px; padding:6px; margin-bottom:10px;"
->
+<!-- CREDENTIAL DETAIL/EDIT MODAL -->
+<div id="credentialModal" class="modal-backdrop hidden">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modalTitle">Credential</h2>
+      <button class="btn-icon" onclick="closeCredentialModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
 
-<table border="1">
+    <!-- View section -->
+    <div id="viewSection" class="modal-body">
+      <div class="detail-row">
+        <span class="detail-label">Service</span>
+        <span class="detail-value" id="modalServiceText"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Username</span>
+        <span class="detail-value">
+          <span id="modalUsernameText"></span>
+          <button class="btn-icon" onclick="copyModalUsername()" title="Copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          </button>
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Password</span>
+        <span class="detail-value">
+          <span id="modalPasswordText">••••••••</span>
+          <button class="btn-icon" id="modalTogglePasswordBtn" onclick="toggleModalPassword()" title="Show">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn-icon" onclick="copyModalPassword()" title="Copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          </button>
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">URL</span>
+        <span class="detail-value" id="modalUrlText"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Notes</span>
+        <span class="detail-value" id="modalNotesText" style="font-size:13px;color:var(--fg-secondary);"></span>
+      </div>
+      <input type="hidden" id="modalCredentialId">
+    </div>
 
-<tr>
-<th>Servizio</th>
-<th>Username</th>
-<th>Password</th>
-<th>Azioni</th>
-</tr>
-
-<tbody id="credentialsTableBody">
-<?php foreach($credentials as $cred): ?>
-
-<tr
-    data-id="<?php echo $cred["credential_id"]; ?>"
-    data-service="<?php echo htmlspecialchars($cred["service_name"], ENT_QUOTES); ?>"
-    data-username="<?php echo htmlspecialchars($cred["username"], ENT_QUOTES); ?>"
-    data-url="<?php echo htmlspecialchars($cred["url"] ?? "", ENT_QUOTES); ?>"
-    data-notes="<?php echo htmlspecialchars($cred["notes"] ?? "", ENT_QUOTES); ?>"
->
-
-<td><?php echo htmlspecialchars($cred["service_name"]); ?></td>
-<td><?php echo htmlspecialchars($cred["username"]); ?></td>
-<td>********</td>
-<td>
-    <button type="button" onclick="openCredentialModal(this.closest('tr'), 'view')">Dettaglio</button>
-    <button type="button" onclick="openCredentialModal(this.closest('tr'), 'edit')">Modifica</button>
-</td>
-
-</tr>
-
-<?php endforeach; ?>
-</tbody>
-</table>
-
-<div id="addModal" hidden>
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.4);" onclick="closeAddModal()"></div>
-    <div style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; width:90%; max-width:600px; border:1px solid #ccc; z-index:10;">
-
-        <h2>Nuova credenziale</h2>
-
-        <form id="addCredentialForm">
+    <!-- Edit section -->
+    <div id="editSection" class="modal-body hidden">
+      <form id="editCredentialForm">
+        <input type="hidden" name="id" id="editCredentialId">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
-
-        Servizio:<br>
-        <input type="text" name="service_name" required><br><br>
-
-        Username:<br>
-        <input type="text" name="username" required><br><br>
-
-        Password:<br>
-        <input type="password" name="password" id="addPassword" required
-               oninput="updateStrengthIndicator(this.value, 'addPasswordStrength')">
-        <button type="button" onclick="fillGeneratedPassword('addPassword', 'addPasswordStrength')">Genera</button>
-        <span id="addPasswordStrength" style="font-size:0.85em; margin-left:6px;"></span><br><br>
-
-        URL:<br>
-        <input type="text" name="url"><br><br>
-
-        Note:<br>
-        <textarea name="notes"></textarea><br><br>
-
-        <button type="submit">Salva</button>
-
-        </form>
-
-        <br>
-        <button type="button" onclick="closeAddModal()">Chiudi</button>
-    </div>
-</div>
-
-<div id="credentialModal" hidden>
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.4);" onclick="closeCredentialModal()"></div>
-    <div style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; width:90%; max-width:600px; border:1px solid #ccc; z-index:10; max-height:90vh; overflow:auto;">
-        <h2 id="modalTitle">Dettaglio credenziale</h2>
-
-        <div id="viewSection">
-            <p><strong>ID:</strong> <span id="modalCredentialId"></span></p>
-            <p><strong>Servizio:</strong> <span id="modalServiceText"></span></p>
-            <p>
-                <strong>Username:</strong>
-                <span id="modalUsernameText"></span>
-                <button type="button" onclick="copyModalUsername()">Copia username</button>
-            </p>
-            <p>
-                <strong>Password:</strong>
-                <span id="modalPasswordText">********</span>
-                <button type="button" id="modalTogglePasswordBtn" onclick="toggleModalPassword()">Mostra password</button>
-                <button type="button" onclick="copyModalPassword()">Copia password</button>
-            </p>
-            <p><strong>URL:</strong> <span id="modalUrlText"></span></p>
-            <p><strong>Note:</strong><br><span id="modalNotesText"></span></p>
-
-            <p>
-                <button type="button" onclick="changeModalMode('edit')">Vai a modifica</button>
-            </p>
+        <div>
+          <label class="field-label">Service</label>
+          <input type="text" name="service_name" id="editServiceName" class="field-input" required>
         </div>
-
-        <div id="editSection" hidden>
-            <form id="editCredentialForm">
-                <input type="hidden" name="id" id="editCredentialId">
-                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
-
-                Servizio:<br>
-                <input type="text" name="service_name" id="editServiceName" required><br><br>
-
-                Username:<br>
-                <input type="text" name="username" id="editUsername" required><br><br>
-
-                Password (lascia vuoto per non cambiarla):<br>
-                <input type="password" name="password" id="editPassword"
-                       oninput="updateStrengthIndicator(this.value, 'editPasswordStrength')">
-                <button type="button" onclick="fillGeneratedPassword('editPassword', 'editPasswordStrength')">Genera</button>
-                <span id="editPasswordStrength" style="font-size:0.85em; margin-left:6px;"></span><br><br>
-
-                URL:<br>
-                <input type="text" name="url" id="editUrl"><br><br>
-
-                Note:<br>
-                <textarea name="notes" id="editNotes"></textarea><br><br>
-
-                <button type="submit">Salva modifiche</button>
-            </form>
-
-            <p>
-                <button type="button" onclick="changeModalMode('view')">Torna al dettaglio</button>
-            </p>
+        <div style="margin-top:12px;">
+          <label class="field-label">Username / Email</label>
+          <input type="text" name="username" id="editUsername" class="field-input" required>
         </div>
-
-        <hr>
-
-        <h3>Elimina credenziale</h3>
-        <form id="deleteCredentialForm">
-            <input type="hidden" name="id" id="deleteCredentialId">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
-            <button type="submit">Elimina credenziale</button>
-        </form>
-
-        <br>
-        <button type="button" onclick="closeCredentialModal()">Chiudi</button>
+        <div style="margin-top:12px;">
+          <label class="field-label">Password <span style="font-weight:400;color:var(--fg-muted)">(leave blank to keep)</span></label>
+          <div class="field-row">
+            <input type="password" name="password" id="editPassword" class="field-input"
+              oninput="updateStrengthIndicator(this.value, 'editPasswordStrength')">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="fillGeneratedPassword('editPassword','editPasswordStrength')">Generate</button>
+          </div>
+          <span id="editPasswordStrength" style="font-size:12px;color:var(--fg-muted);margin-top:4px;display:block;"></span>
+        </div>
+        <div style="margin-top:12px;">
+          <label class="field-label">URL</label>
+          <input type="text" name="url" id="editUrl" class="field-input">
+        </div>
+        <div style="margin-top:12px;">
+          <label class="field-label">Notes</label>
+          <textarea name="notes" id="editNotes" class="field-input"></textarea>
+        </div>
+      </form>
     </div>
+
+    <div class="modal-footer" id="viewFooter">
+      <form id="deleteCredentialForm" style="margin-right:auto;">
+        <input type="hidden" name="id" id="deleteCredentialId">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
+        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+      </form>
+      <button class="btn btn-secondary" onclick="closeCredentialModal()">Close</button>
+      <button class="btn btn-primary" style="width:auto;" onclick="changeModalMode('edit')">Edit</button>
+    </div>
+    <div class="modal-footer hidden" id="editFooter">
+      <button class="btn btn-secondary" onclick="changeModalMode('view')">← Back</button>
+      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('editCredentialForm').requestSubmit()">Save Changes</button>
+    </div>
+  </div>
 </div>
 
 <script>
 const csrfToken = <?php echo json_encode($csrfToken); ?>;
 
-// Mostra un messaggio semplice in alto nella pagina
 function showMessage(message) {
     const box = document.getElementById('globalMessage');
     box.textContent = message;
-
+    box.classList.add('show');
     setTimeout(function () {
-        box.textContent = '';
+        box.classList.remove('show');
     }, 3000);
 }
 
@@ -259,9 +381,7 @@ function openCredentialModal(row, mode) {
     document.getElementById('modalUsernameText').textContent = row.dataset.username || '';
     document.getElementById('modalUrlText').textContent = row.dataset.url || '-';
     document.getElementById('modalNotesText').textContent = row.dataset.notes || 'Nessuna nota';
-    document.getElementById('modalPasswordText').textContent = '********';
-    document.getElementById('modalTogglePasswordBtn').textContent = 'Mostra password';
-
+    document.getElementById('modalPasswordText').textContent = '••••••••';
     document.getElementById('editCredentialId').value = row.dataset.id;
     document.getElementById('editServiceName').value = row.dataset.service || '';
     document.getElementById('editUsername').value = row.dataset.username || '';
@@ -270,33 +390,37 @@ function openCredentialModal(row, mode) {
     document.getElementById('editNotes').value = row.dataset.notes || '';
 
     document.getElementById('deleteCredentialId').value = row.dataset.id;
-    document.getElementById('credentialModal').hidden = false;
+    document.getElementById('credentialModal').classList.remove('hidden');
 
     changeModalMode(mode);
 }
 
-// Chiude la finestra della credenziale
 function closeCredentialModal() {
-    document.getElementById('credentialModal').hidden = true;
+    document.getElementById('credentialModal').classList.add('hidden');
     currentId = null;
     currentPassword = '';
     isPasswordVisible = false;
 }
 
-// Cambia schermata tra dettaglio e modifica
 function changeModalMode(mode) {
     const viewSection = document.getElementById('viewSection');
     const editSection = document.getElementById('editSection');
+    const viewFooter = document.getElementById('viewFooter');
+    const editFooter = document.getElementById('editFooter');
     const title = document.getElementById('modalTitle');
 
     if (mode === 'edit') {
-        viewSection.hidden = true;
-        editSection.hidden = false;
-        title.textContent = 'Modifica credenziale';
+        viewSection.classList.add('hidden');
+        editSection.classList.remove('hidden');
+        viewFooter.classList.add('hidden');
+        editFooter.classList.remove('hidden');
+        title.textContent = 'Edit Credential';
     } else {
-        viewSection.hidden = false;
-        editSection.hidden = true;
-        title.textContent = 'Dettaglio credenziale';
+        viewSection.classList.remove('hidden');
+        editSection.classList.add('hidden');
+        viewFooter.classList.remove('hidden');
+        editFooter.classList.add('hidden');
+        title.textContent = 'Credential';
     }
 }
 
@@ -312,8 +436,7 @@ async function toggleModalPassword() {
     }
 
     if (isPasswordVisible) {
-        passwordText.textContent = '********';
-        button.textContent = 'Mostra password';
+        passwordText.textContent = '••••••••';
         isPasswordVisible = false;
         return;
     }
@@ -339,7 +462,6 @@ async function toggleModalPassword() {
         }
 
         passwordText.textContent = currentPassword;
-        button.textContent = 'Nascondi password';
         isPasswordVisible = true;
     } catch (error) {
         showMessage('Errore nella richiesta');
@@ -417,7 +539,7 @@ async function updateCredential(event) {
             return;
         }
 
-        const row = document.querySelector('tr[data-id="' + formData.get('id') + '"]');
+        const row = document.querySelector('.credential-row[data-id="' + formData.get('id') + '"]');
 
         if (row) {
             row.dataset.service = formData.get('service_name') || '';
@@ -425,9 +547,10 @@ async function updateCredential(event) {
             row.dataset.url = formData.get('url') || '';
             row.dataset.notes = formData.get('notes') || '';
 
-            const cells = row.querySelectorAll('td');
-            if (cells[0]) cells[0].textContent = formData.get('service_name') || '';
-            if (cells[1]) cells[1].textContent = formData.get('username') || '';
+            const svcEl = row.querySelector('.cred-service');
+            const userEl = row.querySelector('.cred-username');
+            if (svcEl) svcEl.textContent = formData.get('service_name') || '';
+            if (userEl) userEl.textContent = formData.get('username') || '';
         }
 
         currentPassword = '';
@@ -436,9 +559,8 @@ async function updateCredential(event) {
         document.getElementById('modalServiceText').textContent = formData.get('service_name') || '';
         document.getElementById('modalUsernameText').textContent = formData.get('username') || '';
         document.getElementById('modalUrlText').textContent = formData.get('url') || '-';
-        document.getElementById('modalNotesText').textContent = formData.get('notes') || 'Nessuna nota';
-        document.getElementById('modalPasswordText').textContent = '********';
-        document.getElementById('modalTogglePasswordBtn').textContent = 'Mostra password';
+        document.getElementById('modalNotesText').textContent = formData.get('notes') || 'No notes';
+        document.getElementById('modalPasswordText').textContent = '••••••••';
 
         changeModalMode('view');
         showMessage(data.message || 'Credenziale aggiornata');
@@ -471,44 +593,52 @@ async function removeCredential(event) {
             return;
         }
 
-        const row = document.querySelector('tr[data-id="' + formData.get('id') + '"]');
-        if (row) {
-            row.remove();
-        }
+        const row = document.querySelector('.credential-row[data-id="' + formData.get('id') + '"]');
+        if (row) row.remove();
 
         closeCredentialModal();
-        showMessage(data.message || 'Credenziale eliminata');
+        showMessage(data.message || 'Credential deleted');
     } catch (error) {
         showMessage('Errore nella richiesta di eliminazione');
     }
 }
 
-// Apre e chiude la finestra per aggiungere una credenziale
 function openAddModal() {
-    document.getElementById('addModal').hidden = false;
+    document.getElementById('addModal').classList.remove('hidden');
 }
 
 function closeAddModal() {
-    document.getElementById('addModal').hidden = true;
+    document.getElementById('addModal').classList.add('hidden');
+    document.getElementById('addCredentialForm').reset();
 }
 
-// Collega i form agli eventi giusti
+function openGenerateModal() {
+    const pwd = generatePassword(16, true, true, true);
+    navigator.clipboard.writeText(pwd).then(function() {
+        showMessage('Generated: ' + pwd + ' (copied)');
+    }).catch(function() {
+        showMessage('Generated: ' + pwd);
+    });
+}
+
+async function copyUsernameFromRow(row) {
+    const username = row.dataset.username || '';
+    if (!username) { showMessage('No username to copy'); return; }
+    try {
+        await navigator.clipboard.writeText(username);
+        showMessage('Username copied');
+    } catch { showMessage('Copy failed'); }
+}
+
 document.getElementById('editCredentialForm').addEventListener('submit', updateCredential);
 document.getElementById('deleteCredentialForm').addEventListener('submit', removeCredential);
-</script>
 
-<script>
-// Evita problemi con caratteri speciali quando aggiungo una nuova riga
 function escapeHtml(value) {
     return String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-// Aggiunge una nuova credenziale senza ricaricare la pagina
 async function addCredential(event) {
     event.preventDefault();
 
@@ -516,43 +646,52 @@ async function addCredential(event) {
     const formData = new FormData(form);
 
     try {
-        const response = await fetch('credential/add_credential.php', {
-            method: 'POST',
-            body: formData
-        });
-
+        const response = await fetch('credential/add_credential.php', { method: 'POST', body: formData });
         const data = await parseJsonResponse(response);
 
         if (!response.ok || !data.success) {
-            showMessage(data.message || 'Errore durante l\'aggiunta');
+            showMessage(data.message || 'Error adding credential');
             return;
         }
 
-        const tableBody = document.getElementById('credentialsTableBody');
-        const newRow = document.createElement('tr');
+        const serviceName = formData.get('service_name') || '';
+        const initial = serviceName.charAt(0).toUpperCase();
+        const colors = ['#4A9FD8','#30A46C','#E5484D','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+        const colorIdx = serviceName.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length;
+        const color = colors[colorIdx];
 
+        const list = document.getElementById('credentialsTableBody');
+        const emptyMsg = list.querySelector('div[style]');
+        if (emptyMsg) emptyMsg.remove();
+
+        const newRow = document.createElement('div');
+        newRow.className = 'credential-row';
         newRow.setAttribute('data-id', data.id);
         newRow.setAttribute('data-service', formData.get('service_name'));
         newRow.setAttribute('data-username', formData.get('username'));
         newRow.setAttribute('data-url', formData.get('url') || '');
         newRow.setAttribute('data-notes', formData.get('notes') || '');
-
         newRow.innerHTML = `
-            <td>${escapeHtml(formData.get('service_name') || '')}</td>
-            <td>${escapeHtml(formData.get('username') || '')}</td>
-            <td>********</td>
-            <td>
-                <button type="button" onclick="openCredentialModal(this.closest('tr'), 'view')">Dettaglio</button>
-                <button type="button" onclick="openCredentialModal(this.closest('tr'), 'edit')">Modifica</button>
-            </td>
-        `;
+            <div class="cred-avatar" style="background:${color};">${escapeHtml(initial)}</div>
+            <div class="cred-info">
+                <div class="cred-service">${escapeHtml(serviceName)}</div>
+                <div class="cred-username">${escapeHtml(formData.get('username') || '')}</div>
+            </div>
+            <div class="cred-actions">
+                <button class="btn-icon" onclick="copyUsernameFromRow(this.closest('.credential-row'))" title="Copy username">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                </button>
+                <button class="btn-icon" onclick="openCredentialModal(this.closest('.credential-row'), 'view')" title="More options">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                </button>
+            </div>`;
 
-        tableBody.prepend(newRow);
+        list.prepend(newRow);
         form.reset();
         closeAddModal();
-        showMessage(data.message || 'Credenziale aggiunta');
+        showMessage(data.message || 'Credential added');
     } catch (error) {
-        showMessage('Errore nella richiesta di aggiunta');
+        showMessage('Error adding credential');
     }
 }
 
@@ -721,89 +860,95 @@ function exportCredentials(format) {
     document.body.removeChild(form);
 }
 
-// Filtra le righe della tabella in base al testo cercato
 function filterCredentials() {
     const query = document.getElementById('searchInput').value.toLowerCase().trim();
-    const rows = document.querySelectorAll('#credentialsTableBody tr');
-
-    rows.forEach(function(row) {
-        // Cerca nei dati del servizio, username e URL
+    document.querySelectorAll('#credentialsTableBody .credential-row').forEach(function(row) {
         const service = (row.dataset.service || '').toLowerCase();
         const username = (row.dataset.username || '').toLowerCase();
         const url = (row.dataset.url || '').toLowerCase();
-
-        const matches = service.includes(query) || username.includes(query) || url.includes(query);
-        row.style.display = matches ? '' : 'none';
+        row.style.display = (service.includes(query) || username.includes(query) || url.includes(query)) ? '' : 'none';
     });
 }
 </script>
 
-<!-- Modal importazione CSV -->
-<div id="importModal" hidden>
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.4);" onclick="closeImportModal()"></div>
-    <div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:20px; width:90%; max-width:500px; border:1px solid #ccc; z-index:10;">
-        <h2>Importa credenziali da CSV</h2>
-
-        <p>Il file CSV deve avere le seguenti colonne nell'ordine:</p>
-        <code>servizio, username, password, url (opz.), note (opz.)</code>
-        <p>La prima riga viene considerata l'intestazione e viene saltata.</p>
-
-        <form id="importForm" enctype="multipart/form-data">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
-
-            File CSV:<br>
-            <input type="file" name="csv_file" accept=".csv" required><br><br>
-
-            <button type="submit">Importa</button>
-        </form>
-
-        <br>
-        <button type="button" onclick="closeImportModal()">Chiudi</button>
+<!-- IMPORT MODAL -->
+<div id="importModal" class="modal-backdrop hidden">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Import from CSV</h2>
+      <button class="btn-icon" onclick="closeImportModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--fg-secondary);">
+        The CSV file must have these columns in order:<br>
+        <code style="background:var(--surface-secondary);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:6px;font-size:12px;">service, username, password, url (opt.), notes (opt.)</code><br>
+        The first row (header) is skipped.
+      </p>
+      <form id="importForm" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
+        <div>
+          <label class="field-label">CSV File</label>
+          <input type="file" name="csv_file" accept=".csv" required class="field-input" style="padding:8px;">
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('importForm').requestSubmit()">Import</button>
+    </div>
+  </div>
 </div>
 
-<!-- ===========================
-     SEZIONE IMPOSTAZIONI ESTENSIONE
-     Permette di abilitare/disabilitare l'autofill direttamente dalla dashboard.
-     Comunica con il content script tramite postMessage (sicuro: stessa origine).
-=========================== -->
-<hr>
-<h2>Impostazioni estensione</h2>
-<p>
-  <label>
-    <input type="checkbox" id="autofillToggle">
-    Abilita autofill automatico
-  </label>
-</p>
-<p id="settingsMessage" style="color: green;"></p>
-
 <script>
-// Chiede al content script l'impostazione corrente di autofill
+function openImportModal() { document.getElementById('importModal').classList.remove('hidden'); }
+function closeImportModal() {
+    document.getElementById('importModal').classList.add('hidden');
+    document.getElementById('importForm').reset();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('importForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        try {
+            const response = await fetch('credential/import_credentials.php', { method: 'POST', body: formData });
+            const raw = await response.text();
+            let data;
+            try { data = JSON.parse(raw); } catch { data = { success: false, message: 'Invalid server response' }; }
+            showMessage(data.message || '');
+            closeImportModal();
+            if (data.success && data.imported > 0) {
+                setTimeout(function() { location.reload(); }, 1500);
+            }
+        } catch { showMessage('Import error'); }
+    });
+});
+
+// Extension autofill bridge
 window.postMessage({ type: "km_get_setting", key: "km_autofill_enabled" }, window.location.origin);
 
-// Ascolta la risposta del content script con il valore attuale
 window.addEventListener("message", function(event) {
-    // Accetta solo messaggi dalla stessa origine (sicurezza)
     if (event.origin !== window.location.origin) return;
-
-    // Risposta con il valore dell'impostazione
     if (event.data && event.data.type === "km_setting_value" && event.data.key === "km_autofill_enabled") {
-        document.getElementById("autofillToggle").checked = event.data.value;
+        const toggle = document.getElementById("autofillToggle");
+        if (toggle) toggle.checked = event.data.value;
     }
 });
 
-// Salva l'impostazione quando l'utente cambia il toggle
-document.getElementById("autofillToggle").addEventListener("change", function() {
-    const enabled = this.checked;
-
-    // Invia al content script il nuovo valore da salvare in chrome.storage
-    window.postMessage({ type: "km_set_setting", key: "km_autofill_enabled", value: enabled }, window.location.origin);
-
-    // Conferma visiva
-    const msg = document.getElementById("settingsMessage");
-    msg.textContent = enabled ? "Autofill abilitato." : "Autofill disabilitato.";
-    setTimeout(function() { msg.textContent = ""; }, 2000);
-});
+const autofillToggle = document.getElementById("autofillToggle");
+if (autofillToggle) {
+    autofillToggle.addEventListener("change", function() {
+        const enabled = this.checked;
+        window.postMessage({ type: "km_set_setting", key: "km_autofill_enabled", value: enabled }, window.location.origin);
+        const msg = document.getElementById("settingsMessage");
+        if (msg) {
+            msg.textContent = enabled ? "Autofill enabled" : "Autofill disabled";
+            setTimeout(function() { msg.textContent = ""; }, 2000);
+        }
+    });
+}
 </script>
 
 </body>
