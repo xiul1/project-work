@@ -59,26 +59,36 @@ a:hover { text-decoration: underline; }
 }
 
 .auth-card {
-  display: flex;
+  position: relative;
   width: 100%;
   max-width: 960px;
   min-height: 660px;
   border-radius: var(--r-lg);
   overflow: hidden;
   box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+  background: var(--surface-secondary);
 }
 
-/* Dark panel */
+/* Dark panel — absolute, slides between left and right */
 .auth-panel-dark {
-  width: 380px;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
   background: var(--surface-inverse);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: 48px 36px 36px;
-  position: relative;
+  z-index: 2;
   overflow: hidden;
+  transition: transform 0.65s cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* Sign-up mode: panel moves to the right */
+.auth-card.mode-signup .auth-panel-dark {
+  transform: translateX(150%);
 }
 
 .auth-panel-dark::before,
@@ -147,8 +157,56 @@ a:hover { text-decoration: underline; }
   color: var(--fg-muted);
 }
 
-/* Light panel */
+/* Form panes — absolute, one left one right */
+.auth-form-pane {
+  position: absolute;
+  top: 0;
+  width: 60%;
+  height: 100%;
+  background: var(--surface-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 48px;
+  gap: 24px;
+  z-index: 1;
+  transition: opacity 0.35s ease, transform 0.65s cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* Sign-in pane: right side */
+.auth-pane-signin {
+  right: 0;
+}
+
+/* Sign-up pane: left side */
+.auth-pane-signup {
+  left: 0;
+}
+
+/* In sign-in mode (default): sign-up pane is hidden behind panel */
+.auth-card.mode-signin .auth-pane-signup {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* In sign-up mode: sign-in pane is hidden behind panel */
+.auth-card.mode-signup .auth-pane-signin {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Visible pane fades in after panel settles */
+.auth-card.mode-signin .auth-pane-signin,
+.auth-card.mode-signup .auth-pane-signup {
+  opacity: 1;
+  transition: opacity 0.3s ease 0.3s;
+}
+
+/* Keep old class name for reset-password page compatibility */
 .auth-panel-light {
+  position: relative;
+  z-index: 1;
   flex: 1;
   background: var(--surface-secondary);
   display: flex;
@@ -1119,3 +1177,4 @@ textarea.field-input {
 .text-danger { color: var(--danger); }
 .text-success { color: var(--success); }
 .divider { height: 1px; background: var(--border); }
+
