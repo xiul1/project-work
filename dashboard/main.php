@@ -147,7 +147,7 @@ $totalCreds = count($credentials);
           </div>
           <?php endforeach; ?>
           <?php if (empty($credentials)): ?>
-          <div style="padding:32px;text-align:center;color:var(--fg-muted);font-size:13px;">
+          <div class="empty-credentials-msg" style="padding:32px;text-align:center;color:var(--fg-muted);font-size:13px;">
             No credentials yet. Add your first one above.
           </div>
           <?php endif; ?>
@@ -704,7 +704,7 @@ async function addCredential(event) {
         const color = colors[colorIdx];
 
         const list = document.getElementById('credentialsTableBody');
-        const emptyMsg = list.querySelector('div[style]');
+        const emptyMsg = list.querySelector('.empty-credentials-msg');
         if (emptyMsg) emptyMsg.remove();
 
         const newRow = document.createElement('div');
@@ -825,53 +825,6 @@ function evaluatePasswordStrength(password) {
 }
 
 // =============================================
-// IMPORTAZIONE CREDENZIALI
-// =============================================
-
-function openImportModal() {
-    document.getElementById('importModal').hidden = false;
-}
-
-function closeImportModal() {
-    document.getElementById('importModal').hidden = true;
-    document.getElementById('importForm').reset();
-}
-
-// Invia il file CSV al server tramite fetch e ricarica la pagina se l'importazione ha successo
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('importForm').addEventListener('submit', async function(event) {
-        event.preventDefault();
-
-        const formData = new FormData(this);
-
-        try {
-            const response = await fetch('credential/import_credentials.php', {
-                method: 'POST',
-                body: formData
-            });
-
-            const raw = await response.text();
-            let data;
-            try {
-                data = JSON.parse(raw);
-            } catch {
-                data = { success: false, message: 'Risposta non valida dal server' };
-            }
-
-            showMessage(data.message || '');
-            closeImportModal();
-
-            // Ricarica la pagina per mostrare le nuove credenziali
-            if (data.success && data.imported > 0) {
-                setTimeout(function() { location.reload(); }, 1500);
-            }
-        } catch (error) {
-            showMessage('Errore durante l\'importazione');
-        }
-    });
-});
-
-// =============================================
 // ESPORTAZIONE CREDENZIALI
 // =============================================
 
@@ -976,45 +929,68 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Autofill toggle persistence with localStorage
+// Autofill toggle persistence.
+// Strategia a due livelli:
+//   1. localStorage — immediato, funziona anche senza estensione installata.
+//   2. postMessage bridge → content script → chrome.storage.local (fonte autoritativa).
+// Al caricamento legge subito localStorage; se il content script risponde,
+// aggiorna il toggle E risincronizza localStorage.
+// Al cambio toggle salva SEMPRE in localStorage E invia km_set_setting.
 (function() {
     const AUTOFILL_KEY = "km_autofill_enabled";
+
+    function readLocalStorage() {
+        try {
+            const val = localStorage.getItem(AUTOFILL_KEY);
+            return val === null ? true : val !== "false";
+        } catch (e) {
+            return true;
+        }
+    }
+
+    function writeLocalStorage(enabled) {
+        try {
+            localStorage.setItem(AUTOFILL_KEY, String(enabled));
+        } catch (e) { /* storage non disponibile */ }
+    }
 
     function initAutofillToggle() {
         const toggle = document.getElementById("autofillToggle");
         if (!toggle) return;
 
-        // Load state from localStorage on page load
-        const saved = localStorage.getItem(AUTOFILL_KEY);
-        if (saved !== null) {
-            toggle.checked = saved === "true";
-        }
+        // Applica subito lo stato da localStorage (nessuna race condition)
+        toggle.checked = readLocalStorage();
 
-        // Save state to localStorage when toggled
+        // Imposta il listener PRIMA di inviare il messaggio
+        const messageListener = function(event) {
+            if (event.origin !== window.location.origin) return;
+            if (!event.data || event.data.type !== "km_setting_value") return;
+            if (event.data.key !== AUTOFILL_KEY) return;
+
+            const enabled = event.data.value === undefined ? true : Boolean(event.data.value);
+            toggle.checked = enabled;
+            writeLocalStorage(enabled); // mantieni localStorage sincronizzato
+
+            window.removeEventListener("message", messageListener);
+        };
+        window.addEventListener("message", messageListener);
+
+        // Chiedi il valore autoritativo al content script (se l'estensione è installata)
+        window.postMessage({ type: "km_get_setting", key: AUTOFILL_KEY }, window.location.origin);
+
         toggle.addEventListener("change", function() {
             const enabled = this.checked;
-            localStorage.setItem(AUTOFILL_KEY, enabled ? "true" : "false");
+            writeLocalStorage(enabled); // persisti subito, indipendentemente dall'estensione
+            window.postMessage({ type: "km_set_setting", key: AUTOFILL_KEY, value: enabled }, window.location.origin);
 
             const msg = document.getElementById("settingsMessage");
             if (msg) {
                 msg.textContent = enabled ? "Autofill enabled" : "Autofill disabled";
                 setTimeout(function() { msg.textContent = ""; }, 2000);
             }
-
-            // Sync with extension global storage
-            if (chrome && chrome.storage && chrome.storage.local) {
-                chrome.storage.local.set({
-                    km_autofill_enabled: enabled
-                }, function() {
-                    if (chrome.runtime.lastError) {
-                        console.log("[KeyManager] Chrome storage not available");
-                    }
-                });
-            }
         });
     }
 
-    document.addEventListener("DOMContentLoaded", initAutofillToggle);
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", initAutofillToggle);
     } else {

@@ -43,6 +43,7 @@ const {
   kmIsAutofillEnabled,
   kmGetSuggestionsForPage,
   kmHandleInputFocus,
+  kmHandleSettingsMessage,
 } = require("./content.js");
 
 // ===========================
@@ -1061,5 +1062,141 @@ describe("kmFillFields", () => {
     const credential = { username: "mario", password: "secret123" };
     expect(() => kmFillFields(null, passwordField, credential)).not.toThrow();
     expect(passwordField.value).toBe("secret123");
+  });
+});
+
+// ===========================
+// BUG FIX: kmHandleSettingsMessage
+// La dashboard (main.php) non riusciva a disabilitare l'autofill perché
+// chiamava chrome.storage.local.set direttamente dal contesto pagina web,
+// dove chrome.storage è undefined. Il fix usa il ponte postMessage gestito
+// dal content script. Questi test verificano il gestore del ponte.
+// ===========================
+
+describe("kmHandleSettingsMessage - ponte dashboard ↔ chrome.storage", () => {
+  let postMessageSpy;
+
+  beforeEach(() => {
+    chrome.storage.local.get = jest.fn();
+    chrome.storage.local.set = jest.fn();
+    postMessageSpy = jest.spyOn(window, "postMessage").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    postMessageSpy.mockRestore();
+  });
+
+  it("salva il valore in chrome.storage.local su km_set_setting", () => {
+    kmHandleSettingsMessage({
+      origin: window.location.origin,
+      data: {
+        type: "km_set_setting",
+        key: "km_autofill_enabled",
+        value: false,
+      },
+    });
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({ km_autofill_enabled: false });
+  });
+
+  it("ignora messaggi con origine diversa (sicurezza)", () => {
+    kmHandleSettingsMessage({
+      origin: "http://evil.example.com",
+      data: {
+        type: "km_set_setting",
+        key: "km_autofill_enabled",
+        value: false,
+      },
+    });
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("ignora messaggi senza data", () => {
+    expect(() =>
+      kmHandleSettingsMessage({ origin: window.location.origin })
+    ).not.toThrow();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("ignora messaggi senza type", () => {
+    expect(() =>
+      kmHandleSettingsMessage({ origin: window.location.origin, data: {} })
+    ).not.toThrow();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("ignora km_set_setting senza key", () => {
+    kmHandleSettingsMessage({
+      origin: window.location.origin,
+      data: { type: "km_set_setting", value: false },
+    });
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("risponde a km_get_setting con il valore corrente", () => {
+    chrome.storage.local.get.mockImplementation((keys, cb) =>
+      cb({ km_autofill_enabled: false })
+    );
+
+    kmHandleSettingsMessage({
+      origin: window.location.origin,
+      data: { type: "km_get_setting", key: "km_autofill_enabled" },
+    });
+
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { type: "km_setting_value", key: "km_autofill_enabled", value: false },
+      window.location.origin
+    );
+  });
+
+  it("default a true per km_autofill_enabled se non impostato", () => {
+    chrome.storage.local.get.mockImplementation((keys, cb) => cb({}));
+
+    kmHandleSettingsMessage({
+      origin: window.location.origin,
+      data: { type: "km_get_setting", key: "km_autofill_enabled" },
+    });
+
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { type: "km_setting_value", key: "km_autofill_enabled", value: true },
+      window.location.origin
+    );
+  });
+
+  it("ignora km_get_setting senza key", () => {
+    kmHandleSettingsMessage({
+      origin: window.location.origin,
+      data: { type: "km_get_setting" },
+    });
+    expect(chrome.storage.local.get).not.toHaveBeenCalled();
+    expect(postMessageSpy).not.toHaveBeenCalled();
+  });
+
+  // BUG PERSISTENZA TOGGLE: dopo che l'utente disabilita l'autofill (km_set_setting false),
+  // al refresh la dashboard deve ricevere `false` da km_get_setting — non il default true.
+  // Questo test verifica che il bridge salvi e riluca correttamente il valore false.
+  it("preserva il valore false dopo km_set_setting (fix persistenza toggle)", () => {
+    // Step 1: utente disabilita autofill → dashboard invia km_set_setting false
+    kmHandleSettingsMessage({
+      origin: window.location.origin,
+      data: { type: "km_set_setting", key: "km_autofill_enabled", value: false },
+    });
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({ km_autofill_enabled: false });
+
+    // Step 2: al refresh la dashboard chiede il valore corrente con km_get_setting
+    // Il mock simula che chrome.storage.local ora contenga il valore salvato
+    chrome.storage.local.get.mockImplementation((keys, cb) =>
+      cb({ km_autofill_enabled: false })
+    );
+
+    kmHandleSettingsMessage({
+      origin: window.location.origin,
+      data: { type: "km_get_setting", key: "km_autofill_enabled" },
+    });
+
+    // Il bridge DEVE rispondere con false, non con il default true
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { type: "km_setting_value", key: "km_autofill_enabled", value: false },
+      window.location.origin
+    );
   });
 });

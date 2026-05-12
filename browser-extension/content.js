@@ -458,6 +458,44 @@ function kmIsAutofillEnabled() {
   });
 }
 
+/**
+ * Ponte impostazioni: gestisce i postMessage scambiati con le pagine
+ * della dashboard (main.php, settings.php) per leggere/scrivere
+ * chrome.storage.local — non accessibile dalle pagine web.
+ *
+ * Tipi di messaggio supportati:
+ * - km_set_setting → salva { [key]: value } in chrome.storage.local
+ * - km_get_setting → risponde con km_setting_value contenente il valore
+ *
+ * Sicurezza: accetta solo messaggi dalla stessa origine della pagina.
+ */
+function kmHandleSettingsMessage(event) {
+  if (event.origin !== window.location.origin) return;
+  if (!event.data || !event.data.type) return;
+
+  if (event.data.type === "km_set_setting" && event.data.key) {
+    const obj = {};
+    obj[event.data.key] = event.data.value;
+    chrome.storage.local.set(obj);
+    return;
+  }
+
+  if (event.data.type === "km_get_setting" && event.data.key) {
+    chrome.storage.local.get([event.data.key], (result) => {
+      const value = result[event.data.key];
+      // Default per km_autofill_enabled è true (autofill abilitato)
+      const resolvedValue = (value === undefined && event.data.key === "km_autofill_enabled")
+        ? true
+        : value;
+      window.postMessage({
+        type: "km_setting_value",
+        key: event.data.key,
+        value: resolvedValue
+      }, window.location.origin);
+    });
+  }
+}
+
 
 // ===========================
 // COMPILAZIONE FORM
@@ -828,36 +866,10 @@ if (typeof module === "undefined") {
   });
 
   // --- Ponte impostazioni: ascolta postMessage dalla dashboard ---
-  // Permette alla dashboard di leggere/scrivere impostazioni in chrome.storage
-  // tramite la pagina web in modo sicuro (stesso origin).
-  window.addEventListener("message", (event) => {
-    // Sicurezza: accetta solo messaggi dalla stessa origine della pagina corrente
-    if (event.origin !== window.location.origin) return;
-    if (!event.data || !event.data.type) return;
-
-    if (event.data.type === "km_set_setting" && event.data.key) {
-      // Salva l'impostazione in chrome.storage.local
-      const obj = {};
-      obj[event.data.key] = event.data.value;
-      chrome.storage.local.set(obj);
-    }
-
-    if (event.data.type === "km_get_setting" && event.data.key) {
-      // Restituisce il valore alla pagina tramite postMessage
-      chrome.storage.local.get([event.data.key], (result) => {
-        const value = result[event.data.key];
-        // Default per km_autofill_enabled è true
-        const resolvedValue = (value === undefined && event.data.key === "km_autofill_enabled")
-          ? true
-          : value;
-        window.postMessage({
-          type: "km_setting_value",
-          key: event.data.key,
-          value: resolvedValue
-        }, window.location.origin);
-      });
-    }
-  });
+  // Permette alla dashboard (main.php, settings.php) di leggere/scrivere
+  // impostazioni in chrome.storage tramite il content script, dato che
+  // chrome.storage non è accessibile dal contesto pagina web.
+  window.addEventListener("message", kmHandleSettingsMessage);
 
   // --- Avvio automatico al caricamento della pagina ---
 
@@ -910,6 +922,7 @@ if (typeof module !== "undefined") {
     kmShowFillNotification,
     kmIsAutofillEnabled,
     kmGetSuggestionsForPage,
-    kmHandleInputFocus
+    kmHandleInputFocus,
+    kmHandleSettingsMessage
   };
 }
