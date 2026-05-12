@@ -1,150 +1,357 @@
 * {
   box-sizing: border-box;
-  font-family: "Segoe UI", Tahoma, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  margin: 0;
   width: 360px;
-  background: #f4f7fb;
-  color: #1f2a37;
+  min-height: 560px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F0F1F3 100%);
+  color: #1A1A1A;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
 }
 
-.wrap {
-  padding: 12px;
-}
-
-h1 {
-  margin: 0 0 10px;
-  font-size: 20px;
-}
-
-h2 {
-  margin: 0 0 8px;
-  font-size: 15px;
-}
-
-.card {
-  background: #ffffff;
-  border: 1px solid #d9e1ea;
-  border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-label {
-  display: block;
-  font-size: 12px;
-  margin: 7px 0 4px;
-}
-
-input {
-  width: 100%;
-  padding: 7px;
-  border: 1px solid #c5d0db;
-  border-radius: 6px;
-}
-
-.row {
+.popup {
   display: flex;
-  gap: 8px;
-  margin-top: 10px;
+  flex-direction: column;
+  padding: 16px;
+  min-height: 560px;
+  gap: 12px;
 }
 
-button {
-  border: 0;
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: #155eef;
-  color: #ffffff;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-button:hover {
-  background: #0f4bcc;
-}
-
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 10px 0 0;
-  max-height: 180px;
-  overflow: auto;
-}
-
-.list li {
-  border: 1px solid #dce4ee;
-  border-radius: 6px;
-  padding: 8px;
-  margin-bottom: 8px;
-  background: #fbfdff;
-}
-
-.list .meta {
-  font-size: 12px;
-  color: #3b4a5a;
-  margin-bottom: 6px;
-}
-
-.message {
-  margin: 0;
-  min-height: 16px;
-  font-size: 12px;
-  color: #9a3412;
-}
-
-.small {
-  font-size: 12px;
-  color: #41566b;
-  margin: 8px 0 0;
-}
-
-/* Nasconde elementi — mostrati via JS */
 .hidden {
   display: none !important;
 }
 
-/* Card centrata per la vista "non loggato" */
-.card--center {
-  text-align: center;
-  padding: 20px 14px;
+/* ── Header ── */
+.km-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #E8E8EC;
 }
 
-.icon-lock {
-  font-size: 32px;
-  margin: 0 0 8px;
+.km-logo-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
-.msg-login {
+.km-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.km-title-blue {
+  color: #4A9FD8;
+}
+
+.km-spacer {
+  flex: 1;
+}
+
+.km-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #888888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.km-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1A1A1A;
+}
+
+.km-icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Search ── */
+.km-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #E8E8EC;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.km-search-icon {
+  width: 16px;
+  height: 16px;
+  color: #888888;
+  flex-shrink: 0;
+}
+
+.km-search input {
+  border: none;
+  background: transparent;
+  outline: none;
   font-size: 13px;
-  color: #41566b;
-  margin: 0 0 14px;
+  color: #1A1A1A;
+  width: 100%;
+  font-family: inherit;
 }
 
-/* Pulsante principale (usato in vista non loggato) */
-.btn-primary {
+.km-search input::placeholder {
+  color: #888888;
+}
+
+/* ── Section ── */
+.km-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.km-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #888888;
+  letter-spacing: 0.8px;
+}
+
+/* ── Site Card ── */
+.km-site-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.km-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.km-site-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.km-site-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1A1A1A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.km-site-sub {
+  font-size: 12px;
+  color: #666666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.km-btn-autofill {
+  background: #1A1A1A;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.km-btn-autofill:hover:not(:disabled) {
+  background: #333333;
+}
+
+.km-btn-autofill:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.km-btn-full {
   width: 100%;
   padding: 10px;
   font-size: 14px;
+  border-radius: 9999px;
+  margin-top: 4px;
 }
 
-/* Pulsante testo per "Apri Dashboard" */
-.btn-link {
-  background: transparent;
-  color: #155eef;
-  border: 1px solid #155eef;
-  font-size: 12px;
-  padding: 5px 10px;
+/* ── Recent List ── */
+.km-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.btn-link:hover {
-  background: #eef4ff;
+.km-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-/* Riga allineata a destra (per il pulsante Dashboard) */
-.row--right {
-  justify-content: flex-end;
-  margin-top: 0;
-  margin-bottom: 6px;
+.km-recent-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.km-recent-item .km-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
+}
+
+.km-recent-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.km-recent-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1A1A1A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.km-recent-sub {
+  font-size: 11px;
+  color: #666666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.km-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: #888888;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.km-copy-btn:hover {
+  color: #1A1A1A;
+}
+
+.km-copy-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── Flex grow spacer ── */
+.km-flex-grow {
+  flex: 1;
+}
+
+/* ── Footer ── */
+.km-footer {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #E8E8EC;
+}
+
+.km-footer-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border: none;
+  border-radius: 12px;
+  padding: 10px 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.km-footer-btn:hover {
+  background: #FFFFFF;
+}
+
+.km-footer-btn svg {
+  width: 18px;
+  height: 18px;
+  color: #1A1A1A;
+}
+
+.km-footer-btn span {
+  font-size: 10px;
+  font-weight: 500;
+  color: #666666;
+}
+
+/* ── Login Card ── */
+.km-login-card {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.km-login-lock {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.km-login-msg {
+  font-size: 13px;
+  color: #666666;
+  margin-bottom: 16px;
+}
+
+/* ── Message toast ── */
+.km-message {
+  position: fixed;
+  bottom: 8px;
+  left: 16px;
+  right: 16px;
+  min-height: 16px;
+  font-size: 11px;
+  color: #9a3412;
+  text-align: center;
+  pointer-events: none;
 }

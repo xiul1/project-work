@@ -442,11 +442,19 @@ function kmShowFillNotification(message) {
  */
 function kmIsAutofillEnabled() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(["km_autofill_enabled"], (result) => {
-      // Se la chiave non è presente, il default è true
-      const enabled = result.km_autofill_enabled;
-      resolve(enabled === undefined ? true : Boolean(enabled));
-    });
+    try {
+      // Use chrome.storage.local (faster than sync, updated immediately)
+      chrome.storage.local.get(["km_autofill_enabled"], (result) => {
+        if (chrome.runtime.lastError) {
+          resolve(true);
+          return;
+        }
+        const enabled = result.km_autofill_enabled;
+        resolve(enabled === undefined ? true : Boolean(enabled));
+      });
+    } catch (error) {
+      resolve(true);
+    }
   });
 }
 
@@ -718,7 +726,11 @@ async function kmCollectCredentialsFromDashboard() {
     throw new Error("Token CSRF non trovato in dashboard.");
   }
 
-  const rows = Array.from(document.querySelectorAll("#credentialsTableBody tr[data-id]"));
+  const rows = Array.from(document.querySelectorAll("#credentialsTableBody [data-id]"));
+  if (rows.length === 0) {
+    throw new Error("Nessuna riga credenziale trovata nel DOM. Selettore: #credentialsTableBody [data-id]");
+  }
+
   const result = [];
 
   for (const row of rows) {
@@ -733,11 +745,14 @@ async function kmCollectCredentialsFromDashboard() {
     let password = "";
     try {
       password = await kmFetchPasswordForCredential(id, csrfInput.value);
-    } catch {
-      continue; // Salta credenziali con errore di recupero password
+    } catch (error) {
+      continue;
     }
 
-    result.push({ id, service_name: serviceName, username, url, notes, password });
+    const credential = { id, service_name: serviceName, username, url, notes, password };
+    credential.site = kmHostFromCredential(credential) || serviceName;
+
+    result.push(credential);
   }
 
   return result;
@@ -789,6 +804,24 @@ if (typeof module === "undefined") {
           message: error && error.message ? error.message : "Errore sincronizzazione"
         }));
       return true; // necessario per sendResponse asincrono
+    }
+
+    if (message.type === "km_autofill") {
+      if (!message.credential) {
+        sendResponse({ success: false, message: "Credenziale non fornita" });
+        return;
+      }
+
+      const loginForms = kmFindLoginForms();
+      if (loginForms.length === 0) {
+        sendResponse({ success: false, message: "Nessun form di login trovato" });
+        return;
+      }
+
+      const { usernameField, passwordField } = loginForms[0];
+      kmFillFields(usernameField, passwordField, message.credential);
+      sendResponse({ success: true });
+      return;
     }
 
     sendResponse({ success: false, message: "Tipo messaggio non gestito" });

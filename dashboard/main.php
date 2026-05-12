@@ -19,12 +19,18 @@ SELECT * FROM credenziali
 WHERE user_id = :uid
 ORDER BY updated_at DESC, created_at DESC
 ");
-
-$stmt->execute([
-":uid" => $_SESSION["user_id"]
-]);
-
+$stmt->execute([":uid" => $_SESSION["user_id"]]);
 $credentials = $stmt->fetchAll();
+
+// Stale passwords (not updated in 6+ months)
+$staleStmt = $pdo->prepare("SELECT COUNT(*) FROM credenziali WHERE user_id = :uid AND (updated_at < DATE_SUB(NOW(), INTERVAL 6 MONTH) OR (updated_at IS NULL AND created_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)))");
+$staleStmt->execute([":uid" => $_SESSION["user_id"]]);
+$weakCount = (int) $staleStmt->fetchColumn();
+
+// Favorites = 3 most recent credentials
+$favStmt = $pdo->prepare("SELECT service_name, username FROM credenziali WHERE user_id = :uid ORDER BY updated_at DESC, created_at DESC LIMIT 3");
+$favStmt->execute([":uid" => $_SESSION["user_id"]]);
+$favorites = $favStmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -91,13 +97,13 @@ $totalCreds = count($credentials);
               <p>Create strong keys</p>
             </div>
           </div>
-          <div class="action-card" onclick="exportCredentials('csv')">
+          <div class="action-card" onclick="openSecurityAudit()">
             <div class="action-card-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="7" height="5" x="7" y="7" rx="1"/><rect width="7" height="5" x="10" y="12" rx="1"/></svg>
             </div>
             <div>
-              <h3>Export</h3>
-              <p>Download your vault</p>
+              <h3>Security Audit</h3>
+              <p>Check vault health</p>
             </div>
           </div>
         </div>
@@ -125,17 +131,17 @@ $totalCreds = count($credentials);
             data-url="<?php echo htmlspecialchars($cred["url"] ?? "", ENT_QUOTES); ?>"
             data-notes="<?php echo htmlspecialchars($cred["notes"] ?? "", ENT_QUOTES); ?>"
           >
-            <div class="cred-avatar" style="background:<?php echo $color; ?>;"><?php echo htmlspecialchars($initial); ?></div>
+            <div class="cred-avatar" style="background:<?php echo $color; ?>1A;color:<?php echo $color; ?>;"><?php echo htmlspecialchars($initial); ?></div>
             <div class="cred-info">
               <div class="cred-service"><?php echo htmlspecialchars($cred["service_name"]); ?></div>
               <div class="cred-username"><?php echo htmlspecialchars($cred["username"]); ?></div>
             </div>
             <div class="cred-actions">
-              <button class="btn-icon" onclick="copyUsernameFromRow(this.closest('.credential-row'))" title="Copy username">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <button class="btn-circle" onclick="copyUsernameFromRow(this.closest('.credential-row'))" title="Copy username">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
               </button>
-              <button class="btn-icon" onclick="openCredentialModal(this.closest('.credential-row'), 'view')" title="More options">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+              <button class="btn-circle" onclick="openCredentialModal(this.closest('.credential-row'), 'view')" title="More options">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
               </button>
             </div>
           </div>
@@ -150,34 +156,71 @@ $totalCreds = count($credentials);
 
     </div>
 
-    <!-- Vault Summary Sidebar -->
+    <!-- Sidebar -->
     <aside class="app-sidebar">
+
+      <!-- Vault Summary -->
       <div class="sidebar-card">
         <h3>Vault Summary</h3>
-        <div class="vault-stat-row">
-          <span>Total Credentials</span>
-          <span><?php echo $totalCreds; ?></span>
+        <div class="vault-stat-big">
+          <span class="stat-label">Total Credentials</span>
+          <span class="stat-val"><?php echo $totalCreds; ?></span>
         </div>
-        <div class="vault-stat-row">
-          <span>Last Sync</span>
-          <span style="font-size:12px;color:var(--fg-muted);">Just now</span>
+        <div class="vault-stat-big">
+          <span class="stat-label">Weak Passwords</span>
+          <span class="stat-val<?php echo $weakCount > 0 ? ' danger' : ''; ?>"><?php echo $weakCount; ?></span>
         </div>
+        <div class="vault-stat-big">
+          <span class="stat-label">Last Sync</span>
+          <span class="stat-val muted">Just now</span>
+        </div>
+      </div>
 
-        <div class="sidebar-section-title" style="margin-top:16px;">Quick Links</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <a href="activity_log.php" class="settings-nav-item" style="padding:6px 8px;font-size:12px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-            Activity Log
-          </a>
-          <a href="settings.php" class="settings-nav-item" style="padding:6px 8px;font-size:12px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-            Settings
-          </a>
-          <a href="../auth/logout.php" class="settings-nav-item" style="padding:6px 8px;font-size:12px;color:var(--danger);">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Sign Out
-          </a>
+      <!-- Categories -->
+      <div class="sidebar-card">
+        <h3>Categories</h3>
+        <div class="sidebar-cat-row">
+          <div class="cat-left">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg-secondary)"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Logins
+          </div>
+          <span class="cat-count"><?php echo $totalCreds; ?></span>
         </div>
+        <div class="sidebar-cat-row">
+          <div class="cat-left">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg-secondary)"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            Cards
+          </div>
+          <span class="cat-count">0</span>
+        </div>
+        <div class="sidebar-cat-row">
+          <div class="cat-left">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg-secondary)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Secure Notes
+          </div>
+          <span class="cat-count">0</span>
+        </div>
+        <div class="sidebar-cat-row">
+          <div class="cat-left">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg-secondary)"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+            Identity
+          </div>
+          <span class="cat-count">0</span>
+        </div>
+      </div>
+
+      <!-- Favorites -->
+      <div class="sidebar-card">
+        <h3>Favorites</h3>
+        <?php if (empty($favorites)): ?>
+          <p style="font-size:12px;color:var(--fg-muted);">No credentials yet.</p>
+        <?php else: foreach ($favorites as $fav): ?>
+        <div class="sidebar-fav-row">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span class="fav-label"><?php echo htmlspecialchars($fav["service_name"]); ?></span>
+          <span class="fav-user"><?php echo htmlspecialchars($fav["username"]); ?></span>
+        </div>
+        <?php endforeach; endif; ?>
       </div>
 
       <!-- Autofill toggle -->
@@ -672,17 +715,17 @@ async function addCredential(event) {
         newRow.setAttribute('data-url', formData.get('url') || '');
         newRow.setAttribute('data-notes', formData.get('notes') || '');
         newRow.innerHTML = `
-            <div class="cred-avatar" style="background:${color};">${escapeHtml(initial)}</div>
+            <div class="cred-avatar" style="background:${color}1A;color:${color};">${escapeHtml(initial)}</div>
             <div class="cred-info">
                 <div class="cred-service">${escapeHtml(serviceName)}</div>
                 <div class="cred-username">${escapeHtml(formData.get('username') || '')}</div>
             </div>
             <div class="cred-actions">
-                <button class="btn-icon" onclick="copyUsernameFromRow(this.closest('.credential-row'))" title="Copy username">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                <button class="btn-circle" onclick="copyUsernameFromRow(this.closest('.credential-row'))" title="Copy username">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                 </button>
-                <button class="btn-icon" onclick="openCredentialModal(this.closest('.credential-row'), 'view')" title="More options">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                <button class="btn-circle" onclick="openCredentialModal(this.closest('.credential-row'), 'view')" title="More options">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                 </button>
             </div>`;
 
@@ -860,6 +903,13 @@ function exportCredentials(format) {
     document.body.removeChild(form);
 }
 
+function openSecurityAudit() {
+    document.getElementById('securityAuditModal').classList.remove('hidden');
+}
+function closeSecurityAudit() {
+    document.getElementById('securityAuditModal').classList.add('hidden');
+}
+
 function filterCredentials() {
     const query = document.getElementById('searchInput').value.toLowerCase().trim();
     document.querySelectorAll('#credentialsTableBody .credential-row').forEach(function(row) {
@@ -926,30 +976,83 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Extension autofill bridge
-window.postMessage({ type: "km_get_setting", key: "km_autofill_enabled" }, window.location.origin);
+// Autofill toggle persistence with localStorage
+(function() {
+    const AUTOFILL_KEY = "km_autofill_enabled";
 
-window.addEventListener("message", function(event) {
-    if (event.origin !== window.location.origin) return;
-    if (event.data && event.data.type === "km_setting_value" && event.data.key === "km_autofill_enabled") {
+    function initAutofillToggle() {
         const toggle = document.getElementById("autofillToggle");
-        if (toggle) toggle.checked = event.data.value;
-    }
-});
+        if (!toggle) return;
 
-const autofillToggle = document.getElementById("autofillToggle");
-if (autofillToggle) {
-    autofillToggle.addEventListener("change", function() {
-        const enabled = this.checked;
-        window.postMessage({ type: "km_set_setting", key: "km_autofill_enabled", value: enabled }, window.location.origin);
-        const msg = document.getElementById("settingsMessage");
-        if (msg) {
-            msg.textContent = enabled ? "Autofill enabled" : "Autofill disabled";
-            setTimeout(function() { msg.textContent = ""; }, 2000);
+        // Load state from localStorage on page load
+        const saved = localStorage.getItem(AUTOFILL_KEY);
+        if (saved !== null) {
+            toggle.checked = saved === "true";
         }
-    });
-}
+
+        // Save state to localStorage when toggled
+        toggle.addEventListener("change", function() {
+            const enabled = this.checked;
+            localStorage.setItem(AUTOFILL_KEY, enabled ? "true" : "false");
+
+            const msg = document.getElementById("settingsMessage");
+            if (msg) {
+                msg.textContent = enabled ? "Autofill enabled" : "Autofill disabled";
+                setTimeout(function() { msg.textContent = ""; }, 2000);
+            }
+
+            // Sync with extension global storage
+            if (chrome && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.set({
+                    km_autofill_enabled: enabled
+                }, function() {
+                    if (chrome.runtime.lastError) {
+                        console.log("[KeyManager] Chrome storage not available");
+                    }
+                });
+            }
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", initAutofillToggle);
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initAutofillToggle);
+    } else {
+        initAutofillToggle();
+    }
+})();
 </script>
+
+<!-- SECURITY AUDIT MODAL -->
+<div id="securityAuditModal" class="modal-backdrop hidden" onclick="closeSecurityAudit()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">
+    <div class="modal-header">
+      <h2>Security Audit</h2>
+      <button class="btn-icon" onclick="closeSecurityAudit()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="vault-stat-row"><span>Total Credentials</span><span><?php echo $totalCreds; ?></span></div>
+      <div class="vault-stat-row"><span>Stale Passwords (&gt;6 months)</span><span class="<?php echo $weakCount > 0 ? 'danger' : ''; ?>"><?php echo $weakCount; ?></span></div>
+      <?php if ($weakCount > 0): ?>
+      <p style="font-size:13px;color:var(--danger);margin-top:8px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <?php echo $weakCount; ?> password<?php echo $weakCount > 1 ? 's' : ''; ?> not updated in over 6 months.
+      </p>
+      <?php endif; ?>
+      <p style="font-size:13px;color:var(--fg-secondary);margin-top:8px;">Keep your vault secure: use unique passwords for each service and update them regularly.</p>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-secondary btn-sm" onclick="exportCredentials('csv')">Export CSV</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportCredentials('json')">Export JSON</button>
+        <button class="btn btn-secondary btn-sm" onclick="openImportModal();closeSecurityAudit();">Import CSV</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" style="width:auto;" onclick="closeSecurityAudit()">Close</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

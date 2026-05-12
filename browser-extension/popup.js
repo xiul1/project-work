@@ -1,51 +1,37 @@
 // ===========================
 // KEYMANAGER - Popup Script
-// Gestisce la UI del popup: controllo login, sincronizzazione, stato sito corrente.
 // ===========================
 
-// URL del progetto (base locale XAMPP)
-const KM_BASE_URL        = "http://localhost/project-work";
-const KM_LOGIN_URL       = KM_BASE_URL + "/auth/login.php";
-const KM_DASHBOARD_URL   = KM_BASE_URL + "/dashboard/main.php";
-const KM_STATUS_URL      = KM_BASE_URL + "/auth/session_status.php";
+const KM_BASE_URL      = "http://localhost/project-work";
+const KM_LOGIN_URL     = KM_BASE_URL + "/auth/login.php";
+const KM_DASHBOARD_URL = KM_BASE_URL + "/dashboard/main.php";
+const KM_SETTINGS_URL  = KM_BASE_URL + "/dashboard/settings.php";
+const KM_STATUS_URL    = KM_BASE_URL + "/auth/session_status.php";
 
-let activeTabId  = null;
-let activeTabUrl = "";
+const AVATAR_COLORS = [
+  "#4285F4", "#34A853", "#E50914", "#FF9900",
+  "#7B68EE", "#FF6B35", "#333333", "#9B59B6"
+];
+
+let activeTabId    = null;
+let activeTabUrl   = "";
+let allCredentials = [];
 
 
-// ===========================
-// UTILITÀ UI
-// ===========================
+// ───────────────── UI UTILS ─────────────────
 
-/** Mostra un messaggio temporaneo in fondo al popup. */
 function setMessage(text) {
   document.getElementById("messageText").textContent = text || "";
 }
 
-/** Formatta un timestamp ISO in data/ora leggibile. */
-function formatDateTime(value) {
-  if (!value) return "mai";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString();
-}
-
-/** Normalizza un URL in hostname senza "www.". */
 function normalizeDomainFromUrl(rawUrl) {
   try {
-    const parsed = new URL(rawUrl);
-    return parsed.hostname.replace(/^www\./, "").toLowerCase();
+    return new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
   } catch {
     return "";
   }
 }
 
-/**
- * Mostra una vista e nasconde l'altra.
- * @param {"loggedIn"|"notLoggedIn"} view
- */
 function showView(view) {
   const loggedIn    = document.getElementById("viewLoggedIn");
   const notLoggedIn = document.getElementById("viewNotLoggedIn");
@@ -59,41 +45,145 @@ function showView(view) {
   }
 }
 
-/** Apre una nuova scheda (o ne porta una esistente in primo piano) con l'URL indicato. */
 function openTab(url) {
   chrome.tabs.create({ url, active: true });
 }
 
+function avatarColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
 
-// ===========================
-// CONTROLLO SESSIONE LOGIN
-// ===========================
+function avatarLetter(name) {
+  return (name || "?").charAt(0).toUpperCase();
+}
 
-/**
- * Controlla se l'utente è loggato nella web app KeyManager.
- * Interroga l'endpoint PHP auth/session_status.php.
- * @returns {Promise<boolean>}
- */
+
+// ───────────────── SESSION CHECK ─────────────────
+
 async function checkLoginStatus() {
   try {
     const response = await fetch(KM_STATUS_URL, { credentials: "include" });
-
     if (!response.ok) return false;
-
     const data = await response.json();
     return data.logged_in === true;
   } catch {
-    // Impossibile raggiungere il server (XAMPP spento, ecc.)
     return false;
   }
 }
 
 
-// ===========================
-// LOGICA POPUP PRINCIPALE
-// ===========================
+// ───────────────── SITE CARD ─────────────────
 
-/** Legge la tab attiva e aggiorna activeTabId / activeTabUrl. */
+function updateSiteCard(domain, cred) {
+  const nameEl   = document.getElementById("siteName");
+  const subEl    = document.getElementById("siteEmail");
+  const avatarEl = document.getElementById("siteAvatar");
+  const autofill = document.getElementById("autofillBtn");
+
+  if (!domain) {
+    nameEl.textContent        = "-";
+    subEl.textContent         = "Nessuna credenziale trovata";
+    avatarEl.textContent      = "?";
+    avatarEl.style.background = "#888888";
+    autofill.disabled         = true;
+    return;
+  }
+
+  if (cred) {
+    nameEl.textContent        = cred.site || domain;
+    subEl.textContent         = cred.username || "";
+    avatarEl.textContent      = avatarLetter(cred.site || domain);
+    avatarEl.style.background = avatarColor(cred.site || domain);
+    autofill.disabled         = false;
+  } else {
+    nameEl.textContent        = domain;
+    subEl.textContent         = "Nessuna credenziale trovata";
+    avatarEl.textContent      = avatarLetter(domain);
+    avatarEl.style.background = avatarColor(domain);
+    autofill.disabled         = true;
+  }
+}
+
+
+// ───────────────── RECENT LIST ─────────────────
+
+const COPY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`;
+
+function buildRecentList(credentials, query) {
+  const list = document.getElementById("recentList");
+  list.innerHTML = "";
+
+  const filtered = query
+    ? credentials.filter(c => {
+        const q = query.toLowerCase();
+        return (c.site || "").toLowerCase().includes(q) ||
+               (c.username || "").toLowerCase().includes(q);
+      })
+    : credentials;
+
+  const items = filtered.slice(0, 4);
+
+  if (items.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "km-recent-item";
+    empty.style.color = "#888888";
+    empty.style.justifyContent = "center";
+    empty.style.cursor = "default";
+    empty.textContent = query ? "Nessun risultato" : "Nessuna credenziale in cache";
+    list.appendChild(empty);
+    return;
+  }
+
+  items.forEach(cred => {
+    const row = document.createElement("div");
+    row.className = "km-recent-item";
+
+    const av = document.createElement("div");
+    av.className = "km-avatar";
+    av.textContent = avatarLetter(cred.site || "");
+    av.style.background = avatarColor(cred.site || "");
+
+    const info = document.createElement("div");
+    info.className = "km-recent-info";
+
+    const name = document.createElement("div");
+    name.className = "km-recent-name";
+    name.textContent = cred.site || "-";
+
+    const sub = document.createElement("div");
+    sub.className = "km-recent-sub";
+    sub.textContent = cred.username || "";
+
+    info.appendChild(name);
+    info.appendChild(sub);
+
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "km-copy-btn";
+    copyBtn.title = "Copia username";
+    copyBtn.innerHTML = COPY_SVG;
+    copyBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (cred.username) {
+        await navigator.clipboard.writeText(cred.username);
+        setMessage("Username copiato!");
+        setTimeout(() => setMessage(""), 1500);
+      }
+    });
+
+    row.appendChild(av);
+    row.appendChild(info);
+    row.appendChild(copyBtn);
+    list.appendChild(row);
+  });
+}
+
+
+// ───────────────── ACTIVE TAB ─────────────────
+
 async function refreshActiveTab() {
   const tabs = await tabsQuery({ active: true, currentWindow: true });
   const tab  = tabs && tabs[0] ? tabs[0] : null;
@@ -108,37 +198,27 @@ async function refreshActiveTab() {
   activeTabUrl = tab.url || "";
 }
 
-/** Aggiorna i dati nella vista "loggato": cache count, ultima sync, dominio. */
 async function refreshStatus() {
   await refreshActiveTab();
 
   const domain = normalizeDomainFromUrl(activeTabUrl);
-  document.getElementById("domainText").textContent = domain || "-";
+  const cache  = await storageGet(["km_credentials_cache"]);
+  allCredentials = Array.isArray(cache.km_credentials_cache) ? cache.km_credentials_cache : [];
 
-  const cache       = await storageGet(["km_credentials_cache", "km_last_sync"]);
-  const credentials = Array.isArray(cache.km_credentials_cache) ? cache.km_credentials_cache : [];
+  const matched = domain
+    ? allCredentials.find(c => {
+        const site = (c.site || "").toLowerCase();
+        return site.includes(domain) || domain.includes(site);
+      })
+    : null;
 
-  document.getElementById("cacheCount").textContent = String(credentials.length);
-  document.getElementById("lastSync").textContent   = formatDateTime(cache.km_last_sync || "");
-
-  const meta       = await runtimeSendMessage({ type: "km_get_sync_meta" });
-  const baseStatus = meta.success && meta.lastError
-    ? "Ultimo errore sync: " + meta.lastError
-    : "";
-
-  if (!activeTabId) {
-    document.getElementById("statusText").textContent = baseStatus || "Scheda attiva non disponibile.";
-    return;
-  }
-
-  if (isDashboardUrl(activeTabUrl)) {
-    document.getElementById("statusText").textContent = baseStatus || "Dashboard rilevata: puoi sincronizzare ora.";
-  } else {
-    document.getElementById("statusText").textContent = baseStatus || "Auto-sync attiva. Puoi sincronizzare anche manualmente.";
-  }
+  updateSiteCard(domain, matched || null);
+  buildRecentList(allCredentials, "");
 }
 
-/** Invia un messaggio al background script. */
+
+// ───────────────── SYNC ─────────────────
+
 function runtimeSendMessage(payload) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(payload, (response) => {
@@ -151,15 +231,11 @@ function runtimeSendMessage(payload) {
   });
 }
 
-/** Sincronizzazione diretta dalla tab attiva (se è la dashboard). */
 async function syncDirectFromActiveTab() {
   await refreshActiveTab();
 
   if (!activeTabId || !isDashboardUrl(activeTabUrl)) {
-    return {
-      success: false,
-      message: "Apri /dashboard/main.php nella tab attiva e riprova."
-    };
+    return { success: false, message: "Apri /dashboard/main.php nella tab attiva e riprova." };
   }
 
   let response = await tabsSendMessage(activeTabId, {
@@ -172,39 +248,33 @@ async function syncDirectFromActiveTab() {
     response.message.includes("Receiving end does not exist")
   ) {
     const injection = await injectContentScript(activeTabId);
-
     if (!injection.success) {
       return {
         success: false,
         message: "Impossibile collegarsi alla pagina: " + (injection.message || "errore injection")
       };
     }
-
     response = await tabsSendMessage(activeTabId, {
       type: "km_collect_credentials_from_dashboard"
     });
   }
 
   if (!response || !response.success) {
-    return {
-      success: false,
-      message: (response && response.message) || "Sincronizzazione diretta fallita"
-    };
+    return { success: false, message: (response && response.message) || "Sincronizzazione diretta fallita" };
   }
 
   const credentials = Array.isArray(response.credentials) ? response.credentials : [];
-
   await storageSet({
     km_credentials_cache: credentials,
     km_last_sync:         new Date().toISOString(),
     km_last_sync_error:   ""
   });
-
   return { success: true, count: credentials.length };
 }
 
-/** Avvia la sincronizzazione tramite background o direttamente dalla tab. */
 async function syncFromDashboard() {
+  setMessage("Sincronizzazione in corso...");
+
   let response = await runtimeSendMessage({ type: "km_sync_now" });
 
   if (
@@ -221,24 +291,45 @@ async function syncFromDashboard() {
   }
 
   await refreshStatus();
-  setMessage("Sincronizzazione completata (" + String(response.count || 0) + " credenziali).");
-}
-
-/** Svuota la cache locale delle credenziali. */
-async function clearCache() {
-  await storageRemove(["km_credentials_cache", "km_last_sync"]);
-  await refreshStatus();
-  setMessage("Cache locale svuotata.");
+  setMessage("Sincronizzato (" + String(response.count || 0) + " credenziali).");
+  setTimeout(() => setMessage(""), 2000);
 }
 
 
-// ===========================
-// INIZIALIZZAZIONE
-// ===========================
+// ───────────────── AUTOFILL ─────────────────
 
-/**
- * Punto d'ingresso: controlla se l'utente è loggato e mostra la vista corretta.
- */
+async function triggerAutofill() {
+  if (!activeTabId) {
+    setMessage("Nessuna tab attiva.");
+    return;
+  }
+
+  const domain = normalizeDomainFromUrl(activeTabUrl);
+  const cred   = allCredentials.find(c => {
+    const site = (c.site || "").toLowerCase();
+    return site.includes(domain) || domain.includes(site);
+  });
+
+  if (!cred) {
+    setMessage("Nessuna credenziale per questo sito.");
+    return;
+  }
+
+  const response = await tabsSendMessage(activeTabId, {
+    type: "km_autofill",
+    credential: cred
+  });
+
+  if (!response || !response.success) {
+    setMessage("Autofill non riuscito.");
+  } else {
+    window.close();
+  }
+}
+
+
+// ───────────────── INIT ─────────────────
+
 async function init() {
   const loggedIn = await checkLoginStatus();
 
@@ -246,15 +337,17 @@ async function init() {
     showView("loggedIn");
     await refreshStatus();
 
-    // Bottoni visibili solo nella vista "loggato"
     document.getElementById("syncBtn").addEventListener("click", syncFromDashboard);
-    document.getElementById("clearBtn").addEventListener("click", clearCache);
-    document.getElementById("refreshBtn").addEventListener("click", refreshStatus);
-    document.getElementById("dashboardBtn").addEventListener("click", () => openTab(KM_DASHBOARD_URL));
+    document.getElementById("settingsBtn").addEventListener("click", () => openTab(KM_SETTINGS_URL));
+    document.getElementById("autofillBtn").addEventListener("click", triggerAutofill);
+    document.getElementById("openVaultBtn").addEventListener("click", () => openTab(KM_DASHBOARD_URL));
+    document.getElementById("addNewBtn").addEventListener("click", () => openTab(KM_DASHBOARD_URL));
+    document.getElementById("generateBtn").addEventListener("click", () => openTab(KM_DASHBOARD_URL));
+    document.getElementById("searchInput").addEventListener("input", (e) => {
+      buildRecentList(allCredentials, e.target.value);
+    });
   } else {
     showView("notLoggedIn");
-
-    // Bottone nella vista "non loggato"
     document.getElementById("loginBtn").addEventListener("click", () => openTab(KM_LOGIN_URL));
   }
 }

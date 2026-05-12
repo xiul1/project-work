@@ -76,6 +76,8 @@ async function collectCredentialsFromTab(tabId) {
       };
     }
 
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     response = await tabsSendMessage(tabId, {
       type: "km_collect_credentials_from_dashboard"
     });

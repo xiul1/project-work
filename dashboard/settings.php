@@ -80,6 +80,22 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Activity Log
       </a>
+      <a href="#billing" class="settings-nav-item" onclick="showTab('billing',this)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Billing
+      </a>
+      <a href="#notifications" class="settings-nav-item" onclick="showTab('notifications',this)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Notifications
+      </a>
+      <a href="#integrations" class="settings-nav-item" onclick="showTab('integrations',this)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Integrations
+      </a>
+      <a href="#about" class="settings-nav-item" onclick="showTab('about',this)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        About
+      </a>
       <div class="divider" style="margin:8px 0;"></div>
       <a href="main.php" class="settings-nav-item">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -133,6 +149,16 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
           </div>
           <div class="settings-row">
             <div class="settings-row-info">
+              <h3>Default Vault</h3>
+              <p>Used when saving new credentials</p>
+            </div>
+            <select class="field-select">
+              <option>Personal</option>
+              <option>Work</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
               <h3>Auto-lock timer</h3>
               <p>Lock vault after inactivity</p>
             </div>
@@ -159,6 +185,16 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
             </div>
             <label class="toggle">
               <input type="checkbox" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <h3>Anonymous analytics</h3>
+              <p>Help improve KeyManager with usage data</p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox">
               <span class="toggle-slider"></span>
             </label>
           </div>
@@ -245,6 +281,75 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
         </p>
       </div>
 
+      <!-- BILLING TAB -->
+      <div id="tab-billing" class="hidden">
+        <div class="settings-heading">
+          <h1>Billing</h1>
+          <p>Manage your subscription and payment methods</p>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Current Plan</div>
+          <div class="settings-row">
+            <div class="settings-row-info"><h3>Free Plan</h3><p>Unlimited credentials, local sync</p></div>
+            <button class="btn btn-primary btn-sm" style="width:auto;">Upgrade</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS TAB -->
+      <div id="tab-notifications" class="hidden">
+        <div class="settings-heading">
+          <h1>Notifications</h1>
+          <p>Choose what you get notified about</p>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Alerts</div>
+          <div class="settings-row">
+            <div class="settings-row-info"><h3>Security alerts</h3><p>Notify on suspicious login attempts</p></div>
+            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info"><h3>Weak password alerts</h3><p>Alert when a password is weak</p></div>
+            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- INTEGRATIONS TAB -->
+      <div id="tab-integrations" class="hidden">
+        <div class="settings-heading">
+          <h1>Integrations</h1>
+          <p>Connect KeyManager with other tools</p>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Browser Extension</div>
+          <div class="settings-row">
+            <div class="settings-row-info"><h3>Browser Autofill</h3><p>Install the extension to autofill credentials</p></div>
+            <button class="btn btn-secondary btn-sm" style="width:auto;">Install Extension</button>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Import / Export</div>
+          <div class="settings-row">
+            <div class="settings-row-info"><h3>Import from CSV</h3><p>Import credentials from another manager</p></div>
+            <a href="main.php" class="btn btn-secondary btn-sm" style="width:auto;">Go to Dashboard</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ABOUT TAB -->
+      <div id="tab-about" class="hidden">
+        <div class="settings-heading">
+          <h1>About</h1>
+          <p>KeyManager — Secure credential management</p>
+        </div>
+        <div class="settings-section">
+          <div class="settings-row"><div class="settings-row-info"><h3>Version</h3></div><span style="font-size:13px;color:var(--fg-secondary);">1.0.0</span></div>
+          <div class="settings-row"><div class="settings-row-info"><h3>Encryption</h3></div><span style="font-size:13px;color:var(--fg-secondary);">AES-256</span></div>
+          <div class="settings-row"><div class="settings-row-info"><h3>Storage</h3></div><span style="font-size:13px;color:var(--fg-secondary);">Local (MySQL)</span></div>
+        </div>
+      </div>
+
     </main>
   </div>
 </div>
@@ -275,6 +380,54 @@ function setTimer(btn) {
     document.querySelectorAll('.timer-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 }
+
+// Autofill toggle persistence with content script bridge
+(function() {
+    const AUTOFILL_KEY = "km_autofill_enabled";
+
+    function initAutofillToggle() {
+        const toggle = document.getElementById("autofillToggleSettings");
+        if (!toggle) return;
+
+        // Load state from extension storage via postMessage bridge
+        window.postMessage({
+            type: "km_get_setting",
+            key: AUTOFILL_KEY
+        }, window.location.origin);
+
+        // Listen for the response from content script
+        const messageListener = (event) => {
+            if (event.origin !== window.location.origin) return;
+            if (event.data.type !== "km_setting_value") return;
+            if (event.data.key !== AUTOFILL_KEY) return;
+
+            // Set toggle checked state based on saved value (default: true)
+            const enabled = event.data.value === undefined ? true : Boolean(event.data.value);
+            toggle.checked = enabled;
+
+            // Remove listener after first response
+            window.removeEventListener("message", messageListener);
+        };
+
+        window.addEventListener("message", messageListener);
+
+        // Save state to extension storage when toggled via postMessage bridge
+        toggle.addEventListener("change", function() {
+            const enabled = this.checked;
+            window.postMessage({
+                type: "km_set_setting",
+                key: AUTOFILL_KEY,
+                value: enabled
+            }, window.location.origin);
+        });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initAutofillToggle);
+    } else {
+        initAutofillToggle();
+    }
+})();
 
 function updateSettingsStrength(pwd) {
     const bar = document.getElementById('settingsStrBar');

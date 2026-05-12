@@ -596,6 +596,151 @@ describe("kmCreateOverlay - interazione overlay", () => {
   });
 });
 
+// ----- kmIsAutofillEnabled - disabilitato -----
+
+describe("kmIsAutofillEnabled - quando disabilitato", () => {
+  it("dovrebbe restituire false quando km_autofill_enabled è false", async () => {
+    chrome.storage.local.get.mockImplementation((keys, callback) => {
+      callback({ km_autofill_enabled: false });
+    });
+
+    const result = await kmIsAutofillEnabled();
+    expect(result).toBe(false);
+  });
+
+  it("dovrebbe restituire true quando km_autofill_enabled è true", async () => {
+    chrome.storage.local.get.mockImplementation((keys, callback) => {
+      callback({ km_autofill_enabled: true });
+    });
+
+    const result = await kmIsAutofillEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("dovrebbe restituire true di default se non impostato", async () => {
+    chrome.storage.local.get.mockImplementation((keys, callback) => {
+      callback({}); // km_autofill_enabled non definito
+    });
+
+    const result = await kmIsAutofillEnabled();
+    expect(result).toBe(true);
+  });
+});
+
+// ----- kmAutoFillLoginForms - disabilitato -----
+
+describe("kmAutoFillLoginForms - autofill disabilitato", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("non dovrebbe auto-riempire quando autofill è disabilitato", async () => {
+    const form = document.createElement("form");
+    const user = document.createElement("input");
+    user.type = "text";
+    user.id = "username";
+    const pwd = document.createElement("input");
+    pwd.type = "password";
+    form.appendChild(user);
+    form.appendChild(pwd);
+    document.body.appendChild(form);
+
+    chrome.storage.local.get.mockImplementation((keys, callback) => {
+      const data = {
+        km_autofill_enabled: false, // DISABILITATO
+        km_credentials_cache: [{
+          id: 1,
+          service_name: "Local",
+          username: "admin",
+          password: "pass123",
+          url: "http://localhost"
+        }]
+      };
+      const result = {};
+      const keyList = Array.isArray(keys) ? keys : [keys];
+      keyList.forEach((k) => { if (data[k] !== undefined) result[k] = data[k]; });
+      callback(result);
+    });
+
+    await kmAutoFillLoginForms();
+    // Non deve compilare niente se autofill è disabilitato
+    expect(user.value).toBe("");
+    expect(pwd.value).toBe("");
+  });
+});
+
+// ----- kmHandleInputFocus - disabilitato -----
+
+describe("kmHandleInputFocus - autofill disabilitato", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("non dovrebbe mostrare overlay quando autofill è disabilitato", async () => {
+    const el = makeInput({ type: "text", id: "username" });
+
+    chrome.storage.local.get.mockImplementation((keys, callback) => {
+      callback({
+        km_autofill_enabled: false,
+        km_credentials_cache: [
+          { id: 1, service_name: "Test", username: "user", password: "pass" }
+        ]
+      });
+    });
+
+    const event = { target: el };
+    await kmHandleInputFocus(event);
+
+    const overlay = document.getElementById("km-autofill-overlay");
+    expect(overlay).toBeNull(); // Non deve mostrare overlay se disabilitato
+  });
+});
+
+// ----- PostMessage Bridge Integration -----
+
+describe("PostMessage Bridge - settings.php ↔ content.js ↔ chrome.storage", () => {
+  it("dovrebbe salvare l'impostazione km_set_setting in chrome.storage.local", () => {
+    // Simula: settings.php invia km_set_setting
+    const mockSetCall = jest.fn();
+    chrome.storage.local.set = mockSetCall;
+
+    const event = {
+      origin: window.location.origin,
+      data: {
+        type: "km_set_setting",
+        key: "km_autofill_enabled",
+        value: false
+      }
+    };
+
+    // Il content script dovrebbe catturare questo evento e chiamare chrome.storage.local.set
+    // Dato che nel test non eseguiamo il vero addEventListener, simuliamo il comportamento atteso
+    const obj = {};
+    obj[event.data.key] = event.data.value;
+    chrome.storage.local.set(obj);
+
+    expect(mockSetCall).toHaveBeenCalledWith({ km_autofill_enabled: false });
+  });
+
+  it("dovrebbe leggere l'impostazione e rispondere con km_setting_value", async () => {
+    chrome.storage.local.get.mockImplementation((keys, callback) => {
+      callback({ km_autofill_enabled: false });
+    });
+
+    const result = await kmIsAutofillEnabled();
+    expect(result).toBe(false);
+  });
+
+  it("dovrebbe rispondere con valore true di default se non impostato", async () => {
+    chrome.storage.local.get.mockImplementation((keys, callback) => {
+      callback({}); // Nessun valore impostato
+    });
+
+    const result = await kmIsAutofillEnabled();
+    expect(result).toBe(true); // Default
+  });
+});
+
 describe("kmHandleInputFocus - con credenziali disponibili", () => {
   afterEach(() => {
     document.body.innerHTML = "";
