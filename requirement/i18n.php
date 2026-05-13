@@ -108,6 +108,7 @@ const TRANSLATIONS = [
         "auth.back_to_signin"      => "← Back to Sign In",
         "auth.panel_signin"        => "Your vault.|Always secure.",
         "auth.panel_signup"        => "Start your|secure journey.",
+        "auth.panel_forgot"        => "Forgot?|No worries.",
         // Error messages
         "auth.err_invalid_email"   => "Invalid email.",
         "auth.err_password_req"    => "Password required.",
@@ -207,7 +208,7 @@ const TRANSLATIONS = [
         "dash.security_alert"      => "Avviso di sicurezza: %d tentativi di login falliti nelle ultime 24 ore.",
 
         // Auth pages
-        "auth.welcome_back"        => "Bentornato",
+        "auth.welcome_back"        => "Ben tornato",
         "auth.signin_subtitle"     => "Accedi al tuo vault",
         "auth.email"               => "Indirizzo email",
         "auth.master_password"     => "Master password",
@@ -227,6 +228,7 @@ const TRANSLATIONS = [
         "auth.back_to_signin"      => "← Torna al login",
         "auth.panel_signin"        => "Il tuo vault.|Sempre sicuro.",
         "auth.panel_signup"        => "Inizia il tuo|viaggio sicuro.",
+        "auth.panel_forgot"        => "Dimenticata?|Nessun problema.",
         // Error messages
         "auth.err_invalid_email"   => "Email non valida.",
         "auth.err_password_req"    => "Password obbligatoria.",

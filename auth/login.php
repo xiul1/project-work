@@ -178,19 +178,19 @@ $currentLang = currentLanguage();
     elseif ($mode === 'forgot')  echo htmlspecialchars(__("auth.reset_password"));
     else                          echo htmlspecialchars(__("auth.sign_in"));
   ?></title>
-  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../assets/css/style.css?v=<?php echo @filemtime(__DIR__ . '/../assets/css/style.css') ?: time(); ?>">
 </head>
 <body>
 
 <!-- Language switcher -->
 <div class="auth-lang-switcher" style="position:fixed;top:16px;right:16px;display:flex;gap:6px;font-size:12px;z-index:10;">
-  <a href="?lang=en<?php echo $mode !== 'signin' ? '&mode=' . htmlspecialchars($mode) : ''; ?>" style="<?php echo $currentLang === 'en' ? 'font-weight:600;color:var(--accent);' : 'color:var(--fg-muted);'; ?>">EN</a>
+  <a id="langEn" href="?lang=en<?php echo $mode !== 'signin' ? '&mode=' . htmlspecialchars($mode) : ''; ?>" style="<?php echo $currentLang === 'en' ? 'font-weight:600;color:var(--accent);' : 'color:var(--fg-muted);'; ?>">EN</a>
   <span style="color:var(--fg-muted);">|</span>
-  <a href="?lang=it<?php echo $mode !== 'signin' ? '&mode=' . htmlspecialchars($mode) : ''; ?>" style="<?php echo $currentLang === 'it' ? 'font-weight:600;color:var(--accent);' : 'color:var(--fg-muted);'; ?>">IT</a>
+  <a id="langIt" href="?lang=it<?php echo $mode !== 'signin' ? '&mode=' . htmlspecialchars($mode) : ''; ?>" style="<?php echo $currentLang === 'it' ? 'font-weight:600;color:var(--accent);' : 'color:var(--fg-muted);'; ?>">IT</a>
 </div>
 
 <div class="auth-shell">
-  <div class="auth-card mode-<?php echo htmlspecialchars($mode === 'forgot' ? 'signin' : $mode); ?>" id="authCard">
+  <div class="auth-card mode-<?php echo htmlspecialchars($mode); ?>" id="authCard">
 
     <!-- Dark sliding panel -->
     <div class="auth-panel-dark">
@@ -200,8 +200,9 @@ $currentLang = currentLanguage();
       </div>
       <div class="auth-dark-tagline" id="panelTagline">
         <?php
-          $signinTagline = explode("|", __("auth.panel_signin"));
-          echo '<h2 id="panelTitle">' . htmlspecialchars($signinTagline[0]) . '<br><span>' . htmlspecialchars($signinTagline[1] ?? "") . '</span></h2>';
+          $taglineKey = $mode === 'signup' ? 'auth.panel_signup' : ($mode === 'forgot' ? 'auth.panel_forgot' : 'auth.panel_signin');
+          $tagline = explode("|", __($taglineKey));
+          echo '<h2 id="panelTitle">' . htmlspecialchars($tagline[0]) . '<br><span>' . htmlspecialchars($tagline[1] ?? "") . '</span></h2>';
         ?>
       </div>
       <div class="auth-dark-stats">
@@ -213,71 +214,71 @@ $currentLang = currentLanguage();
 
     <!-- Sign-In pane (right) -->
     <div class="auth-form-pane auth-pane-signin" id="paneSignin">
-      <?php if ($mode !== 'forgot'): ?>
 
-        <div class="auth-form-header">
-          <h1><?php echo htmlspecialchars(__("auth.welcome_back")); ?></h1>
-          <p><?php echo htmlspecialchars(__("auth.signin_subtitle")); ?></p>
-        </div>
+      <div class="auth-form-header">
+        <h1><?php echo htmlspecialchars(__("auth.welcome_back")); ?></h1>
+        <p><?php echo htmlspecialchars(__("auth.signin_subtitle")); ?></p>
+      </div>
 
-        <?php if ($message_login): ?>
-          <p class="form-message <?php echo str_contains($message_login, 'successo') ? 'success' : ''; ?>">
-            <?php echo htmlspecialchars($message_login); ?>
-          </p>
-        <?php endif; ?>
-
-        <form method="POST" class="auth-form">
-          <input type="hidden" name="action" value="login">
-          <div class="input-group">
-            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-            <input type="email" name="email" placeholder="<?php echo htmlspecialchars(__("auth.email")); ?>" required autocomplete="email">
-          </div>
-          <div>
-            <div class="input-group">
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              <input type="password" name="password" id="loginPassword" placeholder="<?php echo htmlspecialchars(__("auth.master_password")); ?>" required autocomplete="current-password">
-              <button type="button" class="input-action" onclick="togglePwd('loginPassword',this)" aria-label="Mostra password">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-            </div>
-            <div class="form-row-meta" style="margin-top:8px;">
-              <a href="#" onclick="switchMode('forgot');return false;"><?php echo htmlspecialchars(__("auth.forgot_password")); ?></a>
-            </div>
-          </div>
-          <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(__("auth.sign_in")); ?></button>
-        </form>
-
-        <p class="form-footer-text"><?php echo htmlspecialchars(__("auth.no_account")); ?> <a href="#" onclick="switchMode('signup');return false;"><?php echo htmlspecialchars(__("auth.sign_up")); ?></a></p>
-
-      <?php else: ?>
-
-        <!-- Forgot password form shown inside signin pane -->
-        <div class="auth-icon-wrap">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        </div>
-        <div class="auth-form-header">
-          <h1><?php echo htmlspecialchars(__("auth.reset_password")); ?></h1>
-          <p><?php echo htmlspecialchars(__("auth.reset_subtitle")); ?></p>
-        </div>
-
-        <?php if ($message_forgot): ?>
-          <p class="form-message <?php echo str_contains($message_forgot, 'Controlla') ? 'success' : ''; ?>">
-            <?php echo htmlspecialchars($message_forgot); ?>
-          </p>
-        <?php endif; ?>
-
-        <form method="POST" class="auth-form">
-          <input type="hidden" name="action" value="forgot">
-          <div class="input-group">
-            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-            <input type="email" name="email_forgot" placeholder="<?php echo htmlspecialchars(__("auth.email")); ?>" required autocomplete="email">
-          </div>
-          <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(__("auth.send_reset")); ?></button>
-        </form>
-
-        <p class="form-footer-text"><a href="login.php"><?php echo htmlspecialchars(__("auth.back_to_signin")); ?></a></p>
-
+      <?php if ($message_login): ?>
+        <p class="form-message <?php echo str_contains($message_login, 'successo') ? 'success' : ''; ?>">
+          <?php echo htmlspecialchars($message_login); ?>
+        </p>
       <?php endif; ?>
+
+      <form method="POST" class="auth-form">
+        <input type="hidden" name="action" value="login">
+        <div class="input-group">
+          <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <input type="email" name="email" placeholder="<?php echo htmlspecialchars(__("auth.email")); ?>" required autocomplete="email">
+        </div>
+        <div>
+          <div class="input-group">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" name="password" id="loginPassword" placeholder="<?php echo htmlspecialchars(__("auth.master_password")); ?>" required autocomplete="current-password">
+            <button type="button" class="input-action" onclick="togglePwd('loginPassword',this)" aria-label="Mostra password">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="form-row-meta" style="margin-top:8px;">
+            <a href="#" onclick="switchMode('forgot');return false;"><?php echo htmlspecialchars(__("auth.forgot_password")); ?></a>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(__("auth.sign_in")); ?></button>
+      </form>
+
+      <p class="form-footer-text"><?php echo htmlspecialchars(__("auth.no_account")); ?> <a href="#" onclick="switchMode('signup');return false;"><?php echo htmlspecialchars(__("auth.sign_up")); ?></a></p>
+
+    </div>
+
+    <!-- Forgot password pane (left, mirrors signup) -->
+    <div class="auth-form-pane auth-pane-forgot" id="paneForgot">
+
+      <div class="auth-icon-wrap">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="auth-form-header">
+        <h1><?php echo htmlspecialchars(__("auth.reset_password")); ?></h1>
+        <p><?php echo htmlspecialchars(__("auth.reset_subtitle")); ?></p>
+      </div>
+
+      <?php if ($message_forgot): ?>
+        <p class="form-message <?php echo str_contains($message_forgot, 'Controlla') ? 'success' : ''; ?>">
+          <?php echo htmlspecialchars($message_forgot); ?>
+        </p>
+      <?php endif; ?>
+
+      <form method="POST" class="auth-form">
+        <input type="hidden" name="action" value="forgot">
+        <div class="input-group">
+          <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <input type="email" name="email_forgot" placeholder="<?php echo htmlspecialchars(__("auth.email")); ?>" required autocomplete="email">
+        </div>
+        <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(__("auth.send_reset")); ?></button>
+      </form>
+
+      <p class="form-footer-text"><a href="#" onclick="switchMode('signin');return false;"><?php echo htmlspecialchars(__("auth.back_to_signin")); ?></a></p>
+
     </div>
 
     <!-- Sign-Up pane (left) -->
@@ -341,21 +342,78 @@ var card = document.getElementById('authCard');
 var panelTexts = (function () {
     var signin = <?php echo json_encode(__("auth.panel_signin")); ?>.split('|');
     var signup = <?php echo json_encode(__("auth.panel_signup")); ?>.split('|');
+    var forgot = <?php echo json_encode(__("auth.panel_forgot")); ?>.split('|');
     function fmt(parts) {
         return parts[0] + '<br><span>' + (parts[1] || '') + '<\/span>';
     }
-    return { signin: fmt(signin), signup: fmt(signup), forgot: fmt(signin) };
+    return { signin: fmt(signin), signup: fmt(signup), forgot: fmt(forgot) };
 })();
 
+var modeSwitchInFlight = false;
+
 function switchMode(mode) {
-  if (mode === 'forgot') {
-    // Reload page with forgot param so PHP renders the forgot form
-    window.location.href = '?mode=forgot';
+  var title = document.getElementById('panelTitle');
+  var currentMode = (card.className.match(/mode-(\w+)/) || [])[1];
+
+  // History + lang links update immediately
+  var qs = '?';
+  if (mode === 'signup')      qs = '?mode=signup';
+  else if (mode === 'forgot') qs = '?mode=forgot';
+  history.replaceState({}, '', qs);
+  updateLangLinks(mode);
+
+  if (mode === currentMode) {
+    title.innerHTML = panelTexts[mode];
     return;
   }
-  card.className = 'auth-card mode-' + mode;
-  document.getElementById('panelTitle').innerHTML = panelTexts[mode];
-  history.replaceState({}, '', mode === 'signup' ? '?mode=signup' : '?');
+
+  // Respect prefers-reduced-motion: instant swap, no choreography
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) {
+    card.className = 'auth-card mode-' + mode;
+    title.innerHTML = panelTexts[mode];
+    return;
+  }
+
+  if (modeSwitchInFlight) return;
+  modeSwitchInFlight = true;
+
+  // Title fade is intentionally slower than the panel slide:
+  //  t=0      fade-out title (0.82s)            |  panel slide starts (0.85s)
+  //  t=820    title fully hidden -> swap text   |  panel has just settled
+  //  t=840    fade-in title (0.82s)             |
+  //  t=1660   title fully visible
+  card.classList.add('is-animating');
+  title.classList.add('is-changing');
+
+  // Trigger panel slide on the next frame so the title fade-out starts cleanly
+  requestAnimationFrame(function () {
+    card.className = 'auth-card mode-' + mode + ' is-animating';
+  });
+
+  // Swap title text while invisible (panel finishes ~at the same moment)
+  setTimeout(function () {
+    title.innerHTML = panelTexts[mode];
+  }, 820);
+
+  // Slow fade-in of the new title
+  setTimeout(function () {
+    title.classList.remove('is-changing');
+  }, 840);
+
+  // Release once both the panel and the slow title fade-in have completed
+  setTimeout(function () {
+    card.classList.remove('is-animating');
+    modeSwitchInFlight = false;
+  }, 1720);
+}
+
+function updateLangLinks(mode) {
+  var modeParam = (mode && mode !== 'signin') ? ('&mode=' + encodeURIComponent(mode)) : '';
+  var en = document.getElementById('langEn');
+  var it = document.getElementById('langIt');
+  if (en) en.href = '?lang=en' + modeParam;
+  if (it) it.href = '?lang=it' + modeParam;
 }
 
 function togglePwd(id, btn) {

@@ -122,11 +122,21 @@ a:hover { text-decoration: underline; }
   padding: 48px 36px 36px;
   z-index: 2;
   overflow: hidden;
-  transition: transform 0.65s cubic-bezier(0.77, 0, 0.175, 1);
+  will-change: transform, box-shadow;
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+  transition:
+    transform 0.85s cubic-bezier(0.7, 0, 0.2, 1),
+    box-shadow 0.85s cubic-bezier(0.7, 0, 0.2, 1);
 }
 
-/* Sign-up mode: panel moves to the right */
-.auth-card.mode-signup .auth-panel-dark {
+/* Mid-slide lift: deeper shadow while the panel is in motion */
+.auth-card.is-animating .auth-panel-dark {
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35), 0 8px 20px rgba(0,0,0,0.18);
+}
+
+/* Sign-up and Forgot modes: panel moves to the right */
+.auth-card.mode-signup .auth-panel-dark,
+.auth-card.mode-forgot .auth-panel-dark {
   transform: translateX(150%);
 }
 
@@ -172,6 +182,21 @@ a:hover { text-decoration: underline; }
   font-weight: 400;
 }
 
+/* Title fade animation — slower than the panel slide for a softer feel */
+#panelTitle {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.82s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.82s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+#panelTitle.is-changing {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
 .auth-dark-stats {
   display: flex;
   gap: 24px;
@@ -210,7 +235,7 @@ a:hover { text-decoration: underline; }
   padding: 40px 48px;
   gap: 24px;
   z-index: 1;
-  transition: opacity 0.35s ease, transform 0.65s cubic-bezier(0.77, 0, 0.175, 1);
+  transition: opacity 0.35s ease, transform 0.85s cubic-bezier(0.7, 0, 0.2, 1);
 }
 
 /* Sign-in pane: right side */
@@ -223,37 +248,43 @@ a:hover { text-decoration: underline; }
   left: 0;
 }
 
-/* In sign-in mode (default): sign-up pane is hidden behind panel */
-.auth-card.mode-signin .auth-pane-signup {
-  opacity: 0;
-  pointer-events: none;
+/* Forgot pane: left side (mirrors sign-up) */
+.auth-pane-forgot {
+  left: 0;
 }
 
-/* In sign-up mode: sign-in pane is hidden behind panel */
-.auth-card.mode-signup .auth-pane-signin {
+/* Hide non-active panes behind the dark panel */
+.auth-card.mode-signin .auth-pane-signup,
+.auth-card.mode-signin .auth-pane-forgot,
+.auth-card.mode-signup .auth-pane-signin,
+.auth-card.mode-signup .auth-pane-forgot,
+.auth-card.mode-forgot .auth-pane-signin,
+.auth-card.mode-forgot .auth-pane-signup {
   opacity: 0;
   pointer-events: none;
 }
 
 /* Visible pane fades in after panel settles */
 .auth-card.mode-signin .auth-pane-signin,
-.auth-card.mode-signup .auth-pane-signup {
+.auth-card.mode-signup .auth-pane-signup,
+.auth-card.mode-forgot .auth-pane-forgot {
   opacity: 1;
-  transition: opacity 0.3s ease 0.3s;
+  transition: opacity 0.35s ease 0.45s;
 }
 
-/* Keep old class name for reset-password page compatibility */
-.auth-panel-light {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  background: var(--surface-secondary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 56px;
-  gap: 28px;
+/* Reduced motion: keep mode-switching usable but remove movement */
+@media (prefers-reduced-motion: reduce) {
+  .auth-panel-dark,
+  .auth-form-pane,
+  #panelTitle {
+    transition: opacity 0.15s ease !important;
+  }
+  .auth-card.is-animating .auth-panel-dark {
+    box-shadow: none;
+  }
+  #panelTitle.is-changing {
+    transform: none;
+  }
 }
 
 .auth-form-header {
