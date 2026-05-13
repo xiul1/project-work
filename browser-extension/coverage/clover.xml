@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1778582971562" clover="3.2.0">
-  <project timestamp="1778582971562" name="All files">
+<coverage generated="1778686117204" clover="3.2.0">
+  <project timestamp="1778686117204" name="All files">
     <metrics statements="223" coveredstatements="200" conditionals="216" coveredconditionals="173" methods="48" coveredmethods="37" elements="487" coveredelements="410" complexity="0" loc="223" ncloc="223" packages="1" files="1" classes="1"/>
     <file name="content.js" path="/Applications/XAMPP/xamppfiles/htdocs/project-work/browser-extension/content.js">
       <metrics statements="223" coveredstatements="200" conditionals="216" coveredconditionals="173" methods="48" coveredmethods="37"/>

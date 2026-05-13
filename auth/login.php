@@ -1,7 +1,19 @@
 <?php
+// Avvia la sessione qui per poter leggere la lingua scelta in precedenza
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
 require "../requirement/pdo.php";
 require "../requirement/mail_config.php";
 require "../requirement/logger.php";
+require "../requirement/i18n.php";
+
+// Se l'utente cambia lingua dalla query string (?lang=en|it)
+if (isset($_GET["lang"]) && setCurrentLanguage($_GET["lang"])) {
+    header("Location: login.php" . (isset($_GET["mode"]) ? "?mode=" . urlencode($_GET["mode"]) : ""));
+    exit();
+}
 
 $message_login    = "";
 $message_register = "";
@@ -15,9 +27,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST['action'] ?? '') === 'login
     $password = $_POST["password"] ?? '';
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message_login = "Email non valida.";
+        $message_login = __("auth.err_invalid_email");
     } elseif (empty($password)) {
-        $message_login = "Password obbligatoria.";
+        $message_login = __("auth.err_password_req");
     } else {
         $stmt = $pdo->prepare("SELECT id, username, password_hash_master, email_verified FROM users WHERE email = :email");
         $stmt->bindValue(":email", $email);
@@ -25,20 +37,36 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST['action'] ?? '') === 'login
         $user = $stmt->fetch();
 
         if (!$user) {
-            $message_login = "Utente non trovato.";
+            $message_login = __("auth.err_user_not_found");
         } elseif ($user["email_verified"] == 0) {
-            $message_login = "Email non verificata.";
+            $message_login = __("auth.err_email_unverified");
         } elseif (password_verify($password, $user["password_hash_master"])) {
-            session_start();
+            // Sessione già avviata in cima al file: rigenera solo l'ID
             session_regenerate_id(true);
             $_SESSION["user_id"]       = $user["id"];
             $_SESSION["username"]      = $user["username"];
             $_SESSION["last_activity"] = time();
+
+            // Conta i fallimenti recenti per rilevare attività sospetta
+            $failStmt = $pdo->prepare("
+                SELECT COUNT(*) FROM activity_log
+                WHERE user_id = :uid
+                  AND action_type = 'login_failed'
+                  AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            ");
+            $failStmt->execute([":uid" => $user["id"]]);
+            $recentFails = (int) $failStmt->fetchColumn();
+            if ($recentFails >= 3) {
+                $_SESSION["security_alert_pending"] = $recentFails;
+            }
+
             logActivity($user["id"], "login", "Login effettuato");
             header("Location: ../dashboard/main.php");
             exit();
         } else {
-            $message_login = "Password errata.";
+            // Login fallito: registra l'IP per rilevare tentativi sospetti
+            logActivity($user["id"], "login_failed", "Password errata");
+            $message_login = __("auth.err_wrong_password");
         }
     }
 }
@@ -51,18 +79,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST['action'] ?? '') === 'regis
     $password = $_POST["password_reg"] ?? '';
 
     if (empty($username)) {
-        $message_register = "Username obbligatorio.";
+        $message_register = __("auth.err_username_req");
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message_register = "Email non valida.";
+        $message_register = __("auth.err_invalid_email");
     } elseif (strlen($password) < 8) {
-        $message_register = "La password deve avere almeno 8 caratteri.";
+        $message_register = __("auth.err_password_short");
     } else {
         $stmt = $pdo->prepare("SELECT id FROM users WHERE email = :email");
         $stmt->bindValue(":email", $email);
         $stmt->execute();
 
         if ($stmt->rowCount() > 0) {
-            $message_register = "Email già registrata.";
+            $message_register = __("auth.err_email_taken");
         } else {
             $password_hash = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("INSERT INTO users (username, email, password_hash_master, email_verified) VALUES (:username, :email, :password_hash_master, 0)");
@@ -85,9 +113,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST['action'] ?? '') === 'regis
             $body    = "Ciao,<br><br>Verifica la tua email: <a href='$link'>$link</a>";
 
             if (sendMail($email, $subject, $body)) {
-                $message_register = "Registrazione completata! Controlla la tua email.";
+                $message_register = __("auth.msg_registered_ok");
             } else {
-                $message_register = "Registrazione completata, ma email non inviata.";
+                $message_register = __("auth.msg_registered_no_mail");
             }
         }
     }
@@ -97,14 +125,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && ($_POST['action'] ?? '') === 'regis
 if ($mode === 'forgot' && $_SERVER["REQUEST_METHOD"] === "POST" && ($_POST['action'] ?? '') === 'forgot') {
     $email = trim($_POST["email_forgot"] ?? '');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message_forgot = "Email non valida.";
+        $message_forgot = __("auth.err_invalid_email");
     } else {
         $stmt = $pdo->prepare("SELECT id FROM users WHERE email = :email");
         $stmt->bindValue(":email", $email);
         $stmt->execute();
         $user = $stmt->fetch();
         if (!$user) {
-            $message_forgot = "Utente non trovato.";
+            $message_forgot = __("auth.err_user_not_found");
         } else {
             $token   = bin2hex(random_bytes(32));
             $expires = date("Y-m-d H:i:s", strtotime("+1 hour"));
@@ -117,36 +145,49 @@ if ($mode === 'forgot' && $_SERVER["REQUEST_METHOD"] === "POST" && ($_POST['acti
             $subject    = "Reset Password - KeyManager";
             $body       = "Ciao,<br><br>Clicca qui per resettare la password: <a href='$reset_link'>$reset_link</a>";
             if (sendMail($email, $subject, $body)) {
-                $message_forgot = "Controlla la tua email per il link di reset.";
+                $message_forgot = __("auth.msg_check_email");
             } else {
-                $message_forgot = "Errore nell'invio dell'email.";
+                $message_forgot = __("auth.msg_mail_error");
             }
         }
     }
 }
 
 if (isset($_GET["timeout"])) {
-    $message_login = "Sessione scaduta per inattività. Effettua nuovamente il login.";
+    $message_login = __("auth.msg_session_expired");
     $mode = 'signin';
 }
 
 if (isset($_GET["verified"])) {
     $v = $_GET["verified"];
-    if ($v === '1')       $message_login = "Email verificata con successo! Puoi accedere.";
-    elseif ($v === 'expired') $message_login = "Il link di verifica è scaduto.";
-    elseif ($v === 'invalid') $message_login = "Link di verifica non valido.";
+    if ($v === '1')       $message_login = __("auth.msg_email_verified");
+    elseif ($v === 'expired') $message_login = __("auth.msg_link_expired");
+    elseif ($v === 'invalid') $message_login = __("auth.msg_link_invalid");
     $mode = 'signin';
 }
+
+$currentLang = currentLanguage();
 ?>
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?php echo htmlspecialchars($currentLang); ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KeyManager — <?php echo $mode === 'signup' ? 'Create Account' : ($mode === 'forgot' ? 'Reset Password' : 'Login'); ?></title>
+  <title>KeyManager — <?php
+    if ($mode === 'signup')      echo htmlspecialchars(__("auth.create_account"));
+    elseif ($mode === 'forgot')  echo htmlspecialchars(__("auth.reset_password"));
+    else                          echo htmlspecialchars(__("auth.sign_in"));
+  ?></title>
   <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
+
+<!-- Language switcher -->
+<div class="auth-lang-switcher" style="position:fixed;top:16px;right:16px;display:flex;gap:6px;font-size:12px;z-index:10;">
+  <a href="?lang=en<?php echo $mode !== 'signin' ? '&mode=' . htmlspecialchars($mode) : ''; ?>" style="<?php echo $currentLang === 'en' ? 'font-weight:600;color:var(--accent);' : 'color:var(--fg-muted);'; ?>">EN</a>
+  <span style="color:var(--fg-muted);">|</span>
+  <a href="?lang=it<?php echo $mode !== 'signin' ? '&mode=' . htmlspecialchars($mode) : ''; ?>" style="<?php echo $currentLang === 'it' ? 'font-weight:600;color:var(--accent);' : 'color:var(--fg-muted);'; ?>">IT</a>
+</div>
 
 <div class="auth-shell">
   <div class="auth-card mode-<?php echo htmlspecialchars($mode === 'forgot' ? 'signin' : $mode); ?>" id="authCard">
@@ -158,7 +199,10 @@ if (isset($_GET["verified"])) {
         <span><span class="logo-key">Key</span>Manager</span>
       </div>
       <div class="auth-dark-tagline" id="panelTagline">
-        <h2 id="panelTitle">Your vault.<br><span>Always secure.</span></h2>
+        <?php
+          $signinTagline = explode("|", __("auth.panel_signin"));
+          echo '<h2 id="panelTitle">' . htmlspecialchars($signinTagline[0]) . '<br><span>' . htmlspecialchars($signinTagline[1] ?? "") . '</span></h2>';
+        ?>
       </div>
       <div class="auth-dark-stats">
         <div class="stat-item"><strong>256-bit</strong><span>Encryption</span></div>
@@ -172,8 +216,8 @@ if (isset($_GET["verified"])) {
       <?php if ($mode !== 'forgot'): ?>
 
         <div class="auth-form-header">
-          <h1>Welcome back</h1>
-          <p>Sign in to access your vault</p>
+          <h1><?php echo htmlspecialchars(__("auth.welcome_back")); ?></h1>
+          <p><?php echo htmlspecialchars(__("auth.signin_subtitle")); ?></p>
         </div>
 
         <?php if ($message_login): ?>
@@ -186,24 +230,24 @@ if (isset($_GET["verified"])) {
           <input type="hidden" name="action" value="login">
           <div class="input-group">
             <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-            <input type="email" name="email" placeholder="Email address" required autocomplete="email">
+            <input type="email" name="email" placeholder="<?php echo htmlspecialchars(__("auth.email")); ?>" required autocomplete="email">
           </div>
           <div>
             <div class="input-group">
               <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              <input type="password" name="password" id="loginPassword" placeholder="Master password" required autocomplete="current-password">
+              <input type="password" name="password" id="loginPassword" placeholder="<?php echo htmlspecialchars(__("auth.master_password")); ?>" required autocomplete="current-password">
               <button type="button" class="input-action" onclick="togglePwd('loginPassword',this)" aria-label="Mostra password">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
             <div class="form-row-meta" style="margin-top:8px;">
-              <a href="#" onclick="switchMode('forgot');return false;">Forgot password?</a>
+              <a href="#" onclick="switchMode('forgot');return false;"><?php echo htmlspecialchars(__("auth.forgot_password")); ?></a>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary">Sign In</button>
+          <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(__("auth.sign_in")); ?></button>
         </form>
 
-        <p class="form-footer-text">Don't have an account? <a href="#" onclick="switchMode('signup');return false;">Sign up</a></p>
+        <p class="form-footer-text"><?php echo htmlspecialchars(__("auth.no_account")); ?> <a href="#" onclick="switchMode('signup');return false;"><?php echo htmlspecialchars(__("auth.sign_up")); ?></a></p>
 
       <?php else: ?>
 
@@ -212,8 +256,8 @@ if (isset($_GET["verified"])) {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
         <div class="auth-form-header">
-          <h1>Reset Password</h1>
-          <p>Enter your email and we'll send you a reset link</p>
+          <h1><?php echo htmlspecialchars(__("auth.reset_password")); ?></h1>
+          <p><?php echo htmlspecialchars(__("auth.reset_subtitle")); ?></p>
         </div>
 
         <?php if ($message_forgot): ?>
@@ -226,12 +270,12 @@ if (isset($_GET["verified"])) {
           <input type="hidden" name="action" value="forgot">
           <div class="input-group">
             <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-            <input type="email" name="email_forgot" placeholder="Email address" required autocomplete="email">
+            <input type="email" name="email_forgot" placeholder="<?php echo htmlspecialchars(__("auth.email")); ?>" required autocomplete="email">
           </div>
-          <button type="submit" class="btn btn-primary">Send Reset Link</button>
+          <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(__("auth.send_reset")); ?></button>
         </form>
 
-        <p class="form-footer-text"><a href="login.php">← Back to Sign In</a></p>
+        <p class="form-footer-text"><a href="login.php"><?php echo htmlspecialchars(__("auth.back_to_signin")); ?></a></p>
 
       <?php endif; ?>
     </div>
@@ -240,8 +284,8 @@ if (isset($_GET["verified"])) {
     <div class="auth-form-pane auth-pane-signup" id="paneSignup">
 
       <div class="auth-form-header">
-        <h1>Create Account</h1>
-        <p>Start protecting your passwords today</p>
+        <h1><?php echo htmlspecialchars(__("auth.create_account")); ?></h1>
+        <p><?php echo htmlspecialchars(__("auth.signup_subtitle")); ?></p>
       </div>
 
       <?php if ($message_register): ?>
@@ -254,16 +298,16 @@ if (isset($_GET["verified"])) {
         <input type="hidden" name="action" value="register">
         <div class="input-group">
           <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-          <input type="text" name="username" placeholder="Full name" required autocomplete="name">
+          <input type="text" name="username" placeholder="<?php echo htmlspecialchars(__("auth.full_name")); ?>" required autocomplete="name">
         </div>
         <div class="input-group">
           <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-          <input type="email" name="email_reg" placeholder="Email address" required autocomplete="email">
+          <input type="email" name="email_reg" placeholder="<?php echo htmlspecialchars(__("auth.email")); ?>" required autocomplete="email">
         </div>
         <div>
           <div class="input-group">
             <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <input type="password" name="password_reg" id="regPassword" placeholder="Master password" required minlength="8"
+            <input type="password" name="password_reg" id="regPassword" placeholder="<?php echo htmlspecialchars(__("auth.master_password")); ?>" required minlength="8"
               autocomplete="new-password" oninput="updateStrength(this.value)">
           </div>
           <div class="strength-bar-wrap" style="margin-top:6px;">
@@ -272,19 +316,19 @@ if (isset($_GET["verified"])) {
         </div>
         <div class="input-group">
           <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <input type="password" name="confirm_password" id="regConfirm" placeholder="Confirm password" required minlength="8" autocomplete="new-password">
+          <input type="password" name="confirm_password" id="regConfirm" placeholder="<?php echo htmlspecialchars(__("auth.confirm_password")); ?>" required minlength="8" autocomplete="new-password">
           <button type="button" class="input-action" onclick="togglePwd('regConfirm',this)" aria-label="Mostra password">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
         <label class="checkbox-row">
           <input type="checkbox" required>
-          I agree to the Terms of Service and Privacy Policy
+          <?php echo htmlspecialchars(__("auth.terms_agree")); ?>
         </label>
-        <button type="submit" class="btn btn-primary">Create Account</button>
+        <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(__("auth.create_account")); ?></button>
       </form>
 
-      <p class="form-footer-text">Already have an account? <a href="#" onclick="switchMode('signin');return false;">Sign in</a></p>
+      <p class="form-footer-text"><?php echo htmlspecialchars(__("auth.have_account")); ?> <a href="#" onclick="switchMode('signin');return false;"><?php echo htmlspecialchars(__("auth.sign_in")); ?></a></p>
 
     </div>
 
@@ -294,11 +338,14 @@ if (isset($_GET["verified"])) {
 <script>
 var card = document.getElementById('authCard');
 
-var panelTexts = {
-  signin: 'Your vault.<br><span>Always secure.<\/span>',
-  signup: 'Start your<br><span>secure journey.<\/span>',
-  forgot: 'Your vault.<br><span>Always secure.<\/span>'
-};
+var panelTexts = (function () {
+    var signin = <?php echo json_encode(__("auth.panel_signin")); ?>.split('|');
+    var signup = <?php echo json_encode(__("auth.panel_signup")); ?>.split('|');
+    function fmt(parts) {
+        return parts[0] + '<br><span>' + (parts[1] || '') + '<\/span>';
+    }
+    return { signin: fmt(signin), signup: fmt(signup), forgot: fmt(signin) };
+})();
 
 function switchMode(mode) {
   if (mode === 'forgot') {

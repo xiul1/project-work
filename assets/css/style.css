@@ -30,6 +30,45 @@
 }
 
 /* =============================================
+   DARK THEME OVERRIDES
+============================================= */
+html[data-theme="dark"] {
+  --accent-light:         #4A9FD826;
+  --surface-primary:      #1A1A1F;
+  --surface-secondary:    #0F0F12;
+  --surface-input:        rgba(40,40,46,0.7);
+  --surface-inverse:      #F7F8FA;
+  --surface-glass:        rgba(30,30,34,0.6);
+  --surface-glass-strong: rgba(30,30,34,0.85);
+  --border:               #2A2A30;
+  --border-glass:         rgba(255,255,255,0.08);
+  --fg-primary:           #F2F2F5;
+  --fg-secondary:         #B3B3BA;
+  --fg-muted:             #8A8A92;
+  --fg-inverse:           #1A1A1A;
+  --shadow:               rgba(0,0,0,0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] {
+    --accent-light:         #4A9FD826;
+    --surface-primary:      #1A1A1F;
+    --surface-secondary:    #0F0F12;
+    --surface-input:        rgba(40,40,46,0.7);
+    --surface-inverse:      #F7F8FA;
+    --surface-glass:        rgba(30,30,34,0.6);
+    --surface-glass-strong: rgba(30,30,34,0.85);
+    --border:               #2A2A30;
+    --border-glass:         rgba(255,255,255,0.08);
+    --fg-primary:           #F2F2F5;
+    --fg-secondary:         #B3B3BA;
+    --fg-muted:             #8A8A92;
+    --fg-inverse:           #1A1A1A;
+    --shadow:               rgba(0,0,0,0.4);
+  }
+}
+
+/* =============================================
    RESET & BASE
 ============================================= */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

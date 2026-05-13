@@ -9,6 +9,8 @@ if (!isset($_SESSION["user_id"])) {
 
 require "../requirement/pdo.php";
 require "../requirement/security.php";
+require "../requirement/preferences.php";
+require "../requirement/i18n.php";
 
 // Controlla che la sessione non sia scaduta
 checkSessionTimeout();
@@ -20,14 +22,21 @@ $userId = (int) $_SESSION["user_id"];
 $stmt = $pdo->prepare("SELECT username, email, created_at FROM users WHERE id = :id");
 $stmt->execute([":id" => $userId]);
 $user = $stmt->fetch();
+
+// Carica preferenze utente e allinea la sessione
+$prefs = getUserPreferences($userId);
+$_SESSION["language"] = $prefs[PREF_KEY_LANGUAGE];
+$_SESSION["auto_lock_minutes"] = (int) $prefs[PREF_KEY_AUTO_LOCK];
+$_SESSION["theme"] = $prefs[PREF_KEY_THEME];
+$lang = currentLanguage();
 ?>
 
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?php echo htmlspecialchars($lang); ?>" data-theme="<?php echo htmlspecialchars($prefs[PREF_KEY_THEME]); ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KeyManager — Settings</title>
+  <title>KeyManager — <?php echo htmlspecialchars(__("settings.title")); ?></title>
   <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
@@ -113,38 +122,38 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
       <!-- GENERAL TAB -->
       <div id="tab-general">
         <div class="settings-heading">
-          <h1>General</h1>
-          <p>Configure how KeyManager looks and behaves</p>
+          <h1><?php echo htmlspecialchars(__("general.heading")); ?></h1>
+          <p><?php echo htmlspecialchars(__("general.subheading")); ?></p>
         </div>
 
         <div class="settings-section">
-          <div class="settings-section-title">Appearance</div>
-          <div class="theme-options">
-            <button class="theme-btn active" onclick="setTheme('light',this)">
+          <div class="settings-section-title"><?php echo htmlspecialchars(__("general.appearance")); ?></div>
+          <div class="theme-options" id="themeOptions">
+            <button class="theme-btn" data-theme="light">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-              Light
+              <?php echo htmlspecialchars(__("general.theme_light")); ?>
             </button>
-            <button class="theme-btn" onclick="setTheme('dark',this)">
+            <button class="theme-btn" data-theme="dark">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-              Dark
+              <?php echo htmlspecialchars(__("general.theme_dark")); ?>
             </button>
-            <button class="theme-btn" onclick="setTheme('system',this)">
+            <button class="theme-btn" data-theme="system">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              System
+              <?php echo htmlspecialchars(__("general.theme_system")); ?>
             </button>
           </div>
         </div>
 
         <div class="settings-section">
-          <div class="settings-section-title">Preferences</div>
+          <div class="settings-section-title"><?php echo htmlspecialchars(__("general.preferences")); ?></div>
           <div class="settings-row">
             <div class="settings-row-info">
-              <h3>Language</h3>
-              <p>Choose your interface language</p>
+              <h3><?php echo htmlspecialchars(__("general.language")); ?></h3>
+              <p><?php echo htmlspecialchars(__("general.language_desc")); ?></p>
             </div>
-            <select class="field-select">
-              <option>English (US)</option>
-              <option>Italiano</option>
+            <select id="languageSelect" class="field-select">
+              <option value="en" <?php echo $prefs[PREF_KEY_LANGUAGE] === "en" ? "selected" : ""; ?>>English (US)</option>
+              <option value="it" <?php echo $prefs[PREF_KEY_LANGUAGE] === "it" ? "selected" : ""; ?>>Italiano</option>
             </select>
           </div>
           <div class="settings-row">
@@ -159,19 +168,20 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
           </div>
           <div class="settings-row">
             <div class="settings-row-info">
-              <h3>Auto-lock timer</h3>
-              <p>Lock vault after inactivity</p>
+              <h3><?php echo htmlspecialchars(__("general.auto_lock")); ?></h3>
+              <p><?php echo htmlspecialchars(__("general.auto_lock_desc")); ?></p>
             </div>
-            <div class="timer-options">
-              <button class="timer-btn" onclick="setTimer(this)">5 min</button>
-              <button class="timer-btn active" onclick="setTimer(this)">30 min</button>
-              <button class="timer-btn" onclick="setTimer(this)">1 hour</button>
+            <div class="timer-options" id="timerOptions">
+              <button class="timer-btn" data-minutes="5"><?php echo htmlspecialchars(__("general.minutes_5")); ?></button>
+              <button class="timer-btn" data-minutes="30"><?php echo htmlspecialchars(__("general.minutes_30")); ?></button>
+              <button class="timer-btn" data-minutes="60"><?php echo htmlspecialchars(__("general.hour_1")); ?></button>
             </div>
           </div>
           <div class="settings-row">
             <div class="settings-row-info">
-              <h3>Browser Autofill</h3>
-              <p>Fill logins automatically on supported sites</p>
+              <h3><?php echo htmlspecialchars(__("general.autofill")); ?></h3>
+              <p><?php echo htmlspecialchars(__("general.autofill_desc")); ?></p>
+              <p id="autofillSettingsMessage" style="font-size:11px;color:var(--fg-muted);margin-top:2px;"></p>
             </div>
             <label class="toggle">
               <input type="checkbox" id="autofillToggleSettings" checked>
@@ -180,18 +190,18 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
           </div>
           <div class="settings-row">
             <div class="settings-row-info">
-              <h3>Clipboard auto-clear</h3>
-              <p>Clear copied passwords after 30 seconds</p>
+              <h3><?php echo htmlspecialchars(__("general.clipboard_clear")); ?></h3>
+              <p><?php echo htmlspecialchars(__("general.clipboard_clear_desc")); ?></p>
             </div>
             <label class="toggle">
-              <input type="checkbox" checked>
+              <input type="checkbox" id="clipboardClearToggle" data-pref-key="clipboard_clear" <?php echo $prefs[PREF_KEY_CLIPBOARD_CLEAR] === "1" ? "checked" : ""; ?>>
               <span class="toggle-slider"></span>
             </label>
           </div>
           <div class="settings-row">
             <div class="settings-row-info">
-              <h3>Anonymous analytics</h3>
-              <p>Help improve KeyManager with usage data</p>
+              <h3><?php echo htmlspecialchars(__("general.analytics")); ?></h3>
+              <p><?php echo htmlspecialchars(__("general.analytics_desc")); ?></p>
             </div>
             <label class="toggle">
               <input type="checkbox">
@@ -306,11 +316,11 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
           <div class="settings-section-title">Alerts</div>
           <div class="settings-row">
             <div class="settings-row-info"><h3>Security alerts</h3><p>Notify on suspicious login attempts</p></div>
-            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            <label class="toggle"><input type="checkbox" data-pref-key="security_alerts" <?php echo $prefs[PREF_KEY_SECURITY_ALERTS] === "1" ? "checked" : ""; ?>><span class="toggle-slider"></span></label>
           </div>
           <div class="settings-row">
             <div class="settings-row-info"><h3>Weak password alerts</h3><p>Alert when a password is weak</p></div>
-            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            <label class="toggle"><input type="checkbox" data-pref-key="weak_pwd_alerts" <?php echo $prefs[PREF_KEY_WEAK_PWD_ALERTS] === "1" ? "checked" : ""; ?>><span class="toggle-slider"></span></label>
           </div>
         </div>
       </div>
@@ -331,8 +341,32 @@ $avatarLetter = strtoupper(substr($username, 0, 1));
         <div class="settings-section">
           <div class="settings-section-title">Import / Export</div>
           <div class="settings-row">
-            <div class="settings-row-info"><h3>Import from CSV</h3><p>Import credentials from another manager</p></div>
-            <a href="main.php" class="btn btn-secondary btn-sm" style="width:auto;">Go to Dashboard</a>
+            <div class="settings-row-info">
+              <h3>Import CSV</h3>
+              <p>Import credentials from a CSV file</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="width:auto;" onclick="openImportCsvModal()">Import CSV</button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <h3>Import JSON</h3>
+              <p>Import credentials from a JSON file</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="width:auto;" onclick="openImportJsonModal()">Import JSON</button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <h3>Export CSV</h3>
+              <p>Download all credentials as a CSV file</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="width:auto;" onclick="exportCredentials('csv')">Export CSV</button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <h3>Export JSON</h3>
+              <p>Download all credentials as a JSON file</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="width:auto;" onclick="exportCredentials('json')">Export JSON</button>
           </div>
         </div>
       </div>
@@ -371,63 +405,73 @@ function showTab(name, link) {
     if (link) link.classList.add('active');
 }
 
-function setTheme(theme, btn) {
-    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-}
+const PREF_ENDPOINT = 'settings/update_preference.php';
+const CURRENT_THEME = <?php echo json_encode($prefs[PREF_KEY_THEME]); ?>;
+const CURRENT_LANGUAGE = <?php echo json_encode($prefs[PREF_KEY_LANGUAGE]); ?>;
+const CURRENT_AUTO_LOCK = <?php echo json_encode($prefs[PREF_KEY_AUTO_LOCK]); ?>;
 
-function setTimer(btn) {
-    document.querySelectorAll('.timer-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-}
-
-// Autofill toggle persistence with content script bridge
-(function() {
-    const AUTOFILL_KEY = "km_autofill_enabled";
-
-    function initAutofillToggle() {
-        const toggle = document.getElementById("autofillToggleSettings");
-        if (!toggle) return;
-
-        // Load state from extension storage via postMessage bridge
-        window.postMessage({
-            type: "km_get_setting",
-            key: AUTOFILL_KEY
-        }, window.location.origin);
-
-        // Listen for the response from content script
-        const messageListener = (event) => {
-            if (event.origin !== window.location.origin) return;
-            if (event.data.type !== "km_setting_value") return;
-            if (event.data.key !== AUTOFILL_KEY) return;
-
-            // Set toggle checked state based on saved value (default: true)
-            const enabled = event.data.value === undefined ? true : Boolean(event.data.value);
-            toggle.checked = enabled;
-
-            // Remove listener after first response
-            window.removeEventListener("message", messageListener);
-        };
-
-        window.addEventListener("message", messageListener);
-
-        // Save state to extension storage when toggled via postMessage bridge
-        toggle.addEventListener("change", function() {
-            const enabled = this.checked;
-            window.postMessage({
-                type: "km_set_setting",
-                key: AUTOFILL_KEY,
-                value: enabled
-            }, window.location.origin);
+function initPreferenceControls() {
+    // Theme buttons
+    if (typeof ThemeManager !== 'undefined') {
+        ThemeManager.bindThemeButtons('#themeOptions', CURRENT_THEME, function (theme) {
+            ThemeManager.persistTheme(theme, csrfToken, PREF_ENDPOINT);
         });
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initAutofillToggle);
-    } else {
-        initAutofillToggle();
+    // Language select
+    const langSelect = document.getElementById('languageSelect');
+    if (langSelect) {
+        langSelect.addEventListener('change', async function () {
+            const value = langSelect.value;
+            const result = await PreferencesClient.savePreference('language', value, csrfToken, PREF_ENDPOINT);
+            if (result && result.success) {
+                location.reload();
+            } else {
+                showMessage(result.message || 'Error');
+            }
+        });
     }
-})();
+
+    // Timer buttons
+    const timerBtns = document.querySelectorAll('#timerOptions .timer-btn');
+    timerBtns.forEach(function (btn) {
+        if (btn.getAttribute('data-minutes') === String(CURRENT_AUTO_LOCK)) {
+            btn.classList.add('active');
+        }
+        btn.addEventListener('click', async function () {
+            timerBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const minutes = btn.getAttribute('data-minutes');
+            const result = await PreferencesClient.savePreference('auto_lock', minutes, csrfToken, PREF_ENDPOINT);
+            if (result && result.success) {
+                showMessage('Auto-lock updated');
+            }
+        });
+    });
+
+    // Generic preference toggles (any checkbox with data-pref-key)
+    document.querySelectorAll('input[type="checkbox"][data-pref-key]').forEach(function (input) {
+        input.addEventListener('change', async function () {
+            const key = input.getAttribute('data-pref-key');
+            const value = input.checked ? '1' : '0';
+            const result = await PreferencesClient.savePreference(key, value, csrfToken, PREF_ENDPOINT);
+            if (!result || !result.success) {
+                input.checked = !input.checked;
+                showMessage(result && result.message ? result.message : 'Could not save');
+            }
+        });
+    });
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() {
+        AutofillToggle.createAutofillToggle("autofillToggleSettings", "autofillSettingsMessage");
+        initPreferenceControls();
+    });
+} else {
+    AutofillToggle.createAutofillToggle("autofillToggleSettings", "autofillSettingsMessage");
+    initPreferenceControls();
+}
 
 function updateSettingsStrength(pwd) {
     const bar = document.getElementById('settingsStrBar');
@@ -471,6 +515,128 @@ document.getElementById('changePasswordForm').addEventListener('submit', async f
         if (link) showTab(hash, link);
     }
 })();
+</script>
+
+<script src="../assets/js/theme.js"></script>
+<script src="../assets/js/preferences-client.js"></script>
+<script src="../assets/js/clipboard.js"></script>
+<script src="../assets/js/autofill-toggle.js"></script>
+<script src="../assets/js/import-export.js"></script>
+
+<!-- IMPORT CSV MODAL -->
+<div id="importCsvModal" class="modal-backdrop hidden">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Import from CSV</h2>
+      <button class="btn-icon" onclick="closeImportCsvModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--fg-secondary);">
+        The CSV file must have these columns in order:<br>
+        <code style="background:var(--surface-secondary);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:6px;font-size:12px;">service, username, password, url (opt.), notes (opt.)</code><br>
+        The first row (header) is skipped.
+      </p>
+      <form id="importCsvForm" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
+        <div style="margin-top:12px;">
+          <label class="field-label">CSV File</label>
+          <input type="file" name="csv_file" accept=".csv" required class="field-input" style="padding:8px;">
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeImportCsvModal()">Cancel</button>
+      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('importCsvForm').requestSubmit()">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT JSON MODAL -->
+<div id="importJsonModal" class="modal-backdrop hidden">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Import from JSON</h2>
+      <button class="btn-icon" onclick="closeImportJsonModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--fg-secondary);">
+        The JSON file must be an array of objects with these fields:<br>
+        <code style="background:var(--surface-secondary);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:6px;font-size:12px;">service_name, username, password, url (opt.), notes (opt.)</code>
+      </p>
+      <form id="importJsonForm" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
+        <div style="margin-top:12px;">
+          <label class="field-label">JSON File</label>
+          <input type="file" name="json_file" accept=".json" required class="field-input" style="padding:8px;">
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeImportJsonModal()">Cancel</button>
+      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('importJsonForm').requestSubmit()">Import</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function exportCredentials(format) {
+    const form = ImportExport.buildExportForm(format, csrfToken, 'credential/export_credentials.php');
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+function openImportCsvModal() { document.getElementById('importCsvModal').classList.remove('hidden'); }
+function closeImportCsvModal() {
+    document.getElementById('importCsvModal').classList.add('hidden');
+    document.getElementById('importCsvForm').reset();
+}
+
+function openImportJsonModal() { document.getElementById('importJsonModal').classList.remove('hidden'); }
+function closeImportJsonModal() {
+    document.getElementById('importJsonModal').classList.add('hidden');
+    document.getElementById('importJsonForm').reset();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('importCsvForm').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        try {
+            const response = await fetch('credential/import_credentials.php', { method: 'POST', body: formData });
+            const data = ImportExport.parseImportResponse(await response.text());
+            showMessage(data.message || '');
+            closeImportCsvModal();
+            if (data.success && data.imported > 0) {
+                setTimeout(function () { location.href = 'main.php'; }, 1500);
+            }
+        } catch { showMessage('Import error'); }
+    });
+
+    document.getElementById('importJsonForm').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        try {
+            const response = await fetch('credential/import_credentials_json.php', { method: 'POST', body: formData });
+            const data = ImportExport.parseImportResponse(await response.text());
+            showMessage(data.message || '');
+            closeImportJsonModal();
+            if (data.success && data.imported > 0) {
+                setTimeout(function () { location.href = 'main.php'; }, 1500);
+            }
+        } catch { showMessage('Import error'); }
+    });
+
+    // Navigate directly to integrations tab if hash is present
+    if (window.location.hash === '#integrations') {
+        const link = document.querySelector('.settings-nav-item[href="#integrations"]');
+        if (link) showTab('integrations', link);
+    }
+});
 </script>
 
 </body>

@@ -1,7 +1,22 @@
 <?php
 
-// Durata massima di inattività in secondi (30 minuti)
+// Durata massima di inattività in secondi (default 30 minuti)
 const SESSION_TIMEOUT_SECONDS = 1800;
+
+// Valori ammessi (minuti) per il timer di auto-lock
+const ALLOWED_AUTO_LOCK_MINUTES = [5, 30, 60];
+
+/**
+ * Restituisce il numero di secondi di inattività consentiti prima
+ * del logout, usando la preferenza in sessione se presente.
+ */
+function getSessionTimeoutSeconds() {
+    $minutes = $_SESSION["auto_lock_minutes"] ?? 30;
+    if (!in_array((int) $minutes, ALLOWED_AUTO_LOCK_MINUTES, true)) {
+        return SESSION_TIMEOUT_SECONDS;
+    }
+    return ((int) $minutes) * 60;
+}
 
 function ensureSessionStarted() {
     if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -47,7 +62,7 @@ function checkSessionTimeout() {
     // Calcola quanto tempo è passato dall'ultima attività
     $inactiveSeconds = $now - $_SESSION["last_activity"];
 
-    if ($inactiveSeconds > SESSION_TIMEOUT_SECONDS) {
+    if ($inactiveSeconds > getSessionTimeoutSeconds()) {
         // Sessione scaduta: pulisci e reindirizza
         $_SESSION = [];
         session_destroy();

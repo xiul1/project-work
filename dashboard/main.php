@@ -8,6 +8,26 @@ if(!isset($_SESSION["user_id"])) {
 
 require "../requirement/pdo.php";
 require "../requirement/security.php";
+require "../requirement/preferences.php";
+require "../requirement/i18n.php";
+require "../requirement/logger.php";
+
+// Carica preferenze utente per allineare la sessione prima del timeout check
+$userId = (int) $_SESSION["user_id"];
+$prefs = getUserPreferences($userId);
+$_SESSION["auto_lock_minutes"] = (int) $prefs[PREF_KEY_AUTO_LOCK];
+$_SESSION["theme"] = $prefs[PREF_KEY_THEME];
+$_SESSION["language"] = $prefs[PREF_KEY_LANGUAGE];
+
+// Banner di sicurezza: tentativi falliti recenti, mostrato solo se l'utente
+// ha attivato gli alert ed esiste un evento sospetto pendente in sessione.
+$securityAlertCount = 0;
+if ($prefs[PREF_KEY_SECURITY_ALERTS] === "1" && isset($_SESSION["security_alert_pending"])) {
+    $securityAlertCount = (int) $_SESSION["security_alert_pending"];
+    unset($_SESSION["security_alert_pending"]);
+    // Audit: registra che il banner è stato effettivamente mostrato all'utente.
+    logActivity($userId, "security_alert_shown", "Failed logins in 24h: $securityAlertCount");
+}
 
 // Controlla se la sessione è scaduta per inattività
 checkSessionTimeout();
@@ -34,7 +54,7 @@ $favorites = $favStmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?php echo htmlspecialchars($prefs[PREF_KEY_LANGUAGE]); ?>" data-theme="<?php echo htmlspecialchars($prefs[PREF_KEY_THEME]); ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -50,6 +70,13 @@ $totalCreds = count($credentials);
 ?>
 
 <div id="globalMessage"></div>
+
+<?php if ($securityAlertCount > 0): ?>
+<div class="security-alert-banner" style="background:rgba(229,72,77,0.12);border:1px solid var(--danger);color:var(--danger);padding:10px 14px;margin:12px 24px 0;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:8px;">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <span><?php echo htmlspecialchars(sprintf(__("dash.security_alert"), $securityAlertCount)); ?></span>
+</div>
+<?php endif; ?>
 
 <div class="app-shell">
 
@@ -84,8 +111,8 @@ $totalCreds = count($credentials);
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             </div>
             <div>
-              <h3>Add Credential</h3>
-              <p>Store new login</p>
+              <h3><?php echo htmlspecialchars(__("dash.add_credential")); ?></h3>
+              <p><?php echo htmlspecialchars(__("dash.add_credential_desc")); ?></p>
             </div>
           </div>
           <div class="action-card" onclick="openGenerateModal()">
@@ -93,8 +120,8 @@ $totalCreds = count($credentials);
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
             </div>
             <div>
-              <h3>Generate Password</h3>
-              <p>Create strong keys</p>
+              <h3><?php echo htmlspecialchars(__("dash.generate_password")); ?></h3>
+              <p><?php echo htmlspecialchars(__("dash.generate_password_desc")); ?></p>
             </div>
           </div>
           <div class="action-card" onclick="openSecurityAudit()">
@@ -102,8 +129,8 @@ $totalCreds = count($credentials);
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="7" height="5" x="7" y="7" rx="1"/><rect width="7" height="5" x="10" y="12" rx="1"/></svg>
             </div>
             <div>
-              <h3>Security Audit</h3>
-              <p>Check vault health</p>
+              <h3><?php echo htmlspecialchars(__("dash.security_audit")); ?></h3>
+              <p><?php echo htmlspecialchars(__("dash.security_audit_desc")); ?></p>
             </div>
           </div>
         </div>
@@ -112,11 +139,12 @@ $totalCreds = count($credentials);
       <!-- Recent Credentials -->
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <span class="section-title" style="margin-bottom:0;">Recent Credentials</span>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-secondary btn-sm" onclick="openImportModal()">Import CSV</button>
-            <button class="btn btn-secondary btn-sm" onclick="exportCredentials('json')">Export JSON</button>
-          </div>
+          <span class="section-title" style="margin-bottom:0;"><?php echo htmlspecialchars(__("dash.recent_credentials")); ?></span>
+          <button id="selectModeBtn" class="btn btn-secondary btn-sm" onclick="toggleSelectMode()"><?php echo htmlspecialchars(__("dash.select")); ?></button>
+        </div>
+        <div id="selectionBar" style="display:none;align-items:center;gap:10px;padding:8px 12px;margin-bottom:8px;background:var(--surface-secondary);border-radius:8px;border:1px solid var(--border);">
+          <span id="selectionCount" style="font-size:13px;color:var(--fg-secondary);flex:1;">0 selected</span>
+          <button id="bulkDeleteBtn" class="btn btn-danger btn-sm" onclick="bulkDeleteSelected()" disabled><?php echo htmlspecialchars(__("dash.delete_selected")); ?></button>
         </div>
         <div class="credential-list" id="credentialsTableBody">
           <?php foreach($credentials as $cred):
@@ -131,6 +159,9 @@ $totalCreds = count($credentials);
             data-url="<?php echo htmlspecialchars($cred["url"] ?? "", ENT_QUOTES); ?>"
             data-notes="<?php echo htmlspecialchars($cred["notes"] ?? "", ENT_QUOTES); ?>"
           >
+            <input type="checkbox" class="select-checkbox" data-id="<?php echo $cred["credential_id"]; ?>"
+              style="display:none;width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:var(--accent);"
+              onclick="event.stopPropagation();updateSelectionCount()">
             <div class="cred-avatar" style="background:<?php echo $color; ?>1A;color:<?php echo $color; ?>;"><?php echo htmlspecialchars($initial); ?></div>
             <div class="cred-info">
               <div class="cred-service"><?php echo htmlspecialchars($cred["service_name"]); ?></div>
@@ -161,24 +192,24 @@ $totalCreds = count($credentials);
 
       <!-- Vault Summary -->
       <div class="sidebar-card">
-        <h3>Vault Summary</h3>
+        <h3><?php echo htmlspecialchars(__("dash.vault_summary")); ?></h3>
         <div class="vault-stat-big">
-          <span class="stat-label">Total Credentials</span>
+          <span class="stat-label"><?php echo htmlspecialchars(__("dash.total_credentials")); ?></span>
           <span class="stat-val"><?php echo $totalCreds; ?></span>
         </div>
         <div class="vault-stat-big">
-          <span class="stat-label">Weak Passwords</span>
+          <span class="stat-label"><?php echo htmlspecialchars(__("dash.weak_passwords")); ?></span>
           <span class="stat-val<?php echo $weakCount > 0 ? ' danger' : ''; ?>"><?php echo $weakCount; ?></span>
         </div>
         <div class="vault-stat-big">
-          <span class="stat-label">Last Sync</span>
-          <span class="stat-val muted">Just now</span>
+          <span class="stat-label"><?php echo htmlspecialchars(__("dash.last_sync")); ?></span>
+          <span class="stat-val muted"><?php echo htmlspecialchars(__("dash.just_now")); ?></span>
         </div>
       </div>
 
       <!-- Categories -->
       <div class="sidebar-card">
-        <h3>Categories</h3>
+        <h3><?php echo htmlspecialchars(__("dash.categories")); ?></h3>
         <div class="sidebar-cat-row">
           <div class="cat-left">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg-secondary)"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
@@ -211,7 +242,7 @@ $totalCreds = count($credentials);
 
       <!-- Favorites -->
       <div class="sidebar-card">
-        <h3>Favorites</h3>
+        <h3><?php echo htmlspecialchars(__("dash.favorites")); ?></h3>
         <?php if (empty($favorites)): ?>
           <p style="font-size:12px;color:var(--fg-muted);">No credentials yet.</p>
         <?php else: foreach ($favorites as $fav): ?>
@@ -223,20 +254,6 @@ $totalCreds = count($credentials);
         <?php endforeach; endif; ?>
       </div>
 
-      <!-- Autofill toggle -->
-      <div class="sidebar-card">
-        <h3>Extension</h3>
-        <div class="settings-row" style="padding:0;border:none;">
-          <div class="settings-row-info">
-            <h3 style="font-size:13px;">Autofill</h3>
-            <p style="font-size:11px;" id="settingsMessage"></p>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" id="autofillToggle">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
     </aside>
 
   </div>
@@ -246,7 +263,7 @@ $totalCreds = count($credentials);
 <div id="addModal" class="modal-backdrop hidden">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-header">
-      <h2>New Credential</h2>
+      <h2><?php echo htmlspecialchars(__("dash.new_credential")); ?></h2>
       <button class="btn-icon" onclick="closeAddModal()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -254,34 +271,34 @@ $totalCreds = count($credentials);
     <form id="addCredentialForm" class="modal-body">
       <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
       <div>
-        <label class="field-label">Service</label>
+        <label class="field-label"><?php echo htmlspecialchars(__("dash.service")); ?></label>
         <input type="text" name="service_name" class="field-input" placeholder="e.g. Google, GitHub" required>
       </div>
       <div>
-        <label class="field-label">Username / Email</label>
+        <label class="field-label"><?php echo htmlspecialchars(__("dash.username")); ?> / Email</label>
         <input type="text" name="username" class="field-input" placeholder="your@email.com" required>
       </div>
       <div>
-        <label class="field-label">Password</label>
+        <label class="field-label"><?php echo htmlspecialchars(__("dash.password")); ?></label>
         <div class="field-row">
           <input type="password" name="password" id="addPassword" class="field-input" required
             oninput="updateStrengthIndicator(this.value, 'addPasswordStrength')">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="fillGeneratedPassword('addPassword','addPasswordStrength')">Generate</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="fillGeneratedPassword('addPassword','addPasswordStrength')"><?php echo htmlspecialchars(__("dash.generate")); ?></button>
         </div>
         <span id="addPasswordStrength" style="font-size:12px;color:var(--fg-muted);margin-top:4px;display:block;"></span>
       </div>
       <div>
-        <label class="field-label">URL (optional)</label>
+        <label class="field-label"><?php echo htmlspecialchars(__("dash.url")); ?></label>
         <input type="text" name="url" class="field-input" placeholder="https://...">
       </div>
       <div>
-        <label class="field-label">Notes (optional)</label>
+        <label class="field-label"><?php echo htmlspecialchars(__("dash.notes")); ?></label>
         <textarea name="notes" class="field-input"></textarea>
       </div>
     </form>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
-      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('addCredentialForm').requestSubmit()">Save</button>
+      <button class="btn btn-secondary" onclick="closeAddModal()"><?php echo htmlspecialchars(__("dash.cancel")); ?></button>
+      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('addCredentialForm').requestSubmit()"><?php echo htmlspecialchars(__("dash.save")); ?></button>
     </div>
   </div>
 </div>
@@ -290,7 +307,7 @@ $totalCreds = count($credentials);
 <div id="credentialModal" class="modal-backdrop hidden">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-header">
-      <h2 id="modalTitle">Credential</h2>
+      <h2 id="modalTitle"><?php echo htmlspecialchars(__("dash.credential")); ?></h2>
       <button class="btn-icon" onclick="closeCredentialModal()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -299,11 +316,11 @@ $totalCreds = count($credentials);
     <!-- View section -->
     <div id="viewSection" class="modal-body">
       <div class="detail-row">
-        <span class="detail-label">Service</span>
+        <span class="detail-label"><?php echo htmlspecialchars(__("dash.service")); ?></span>
         <span class="detail-value" id="modalServiceText"></span>
       </div>
       <div class="detail-row">
-        <span class="detail-label">Username</span>
+        <span class="detail-label"><?php echo htmlspecialchars(__("dash.username")); ?></span>
         <span class="detail-value">
           <span id="modalUsernameText"></span>
           <button class="btn-icon" onclick="copyModalUsername()" title="Copy">
@@ -312,7 +329,7 @@ $totalCreds = count($credentials);
         </span>
       </div>
       <div class="detail-row">
-        <span class="detail-label">Password</span>
+        <span class="detail-label"><?php echo htmlspecialchars(__("dash.password")); ?></span>
         <span class="detail-value">
           <span id="modalPasswordText">••••••••</span>
           <button class="btn-icon" id="modalTogglePasswordBtn" onclick="toggleModalPassword()" title="Show">
@@ -324,11 +341,11 @@ $totalCreds = count($credentials);
         </span>
       </div>
       <div class="detail-row">
-        <span class="detail-label">URL</span>
+        <span class="detail-label"><?php echo htmlspecialchars(__("dash.url")); ?></span>
         <span class="detail-value" id="modalUrlText"></span>
       </div>
       <div class="detail-row">
-        <span class="detail-label">Notes</span>
+        <span class="detail-label"><?php echo htmlspecialchars(__("dash.notes")); ?></span>
         <span class="detail-value" id="modalNotesText" style="font-size:13px;color:var(--fg-secondary);"></span>
       </div>
       <input type="hidden" id="modalCredentialId">
@@ -340,28 +357,28 @@ $totalCreds = count($credentials);
         <input type="hidden" name="id" id="editCredentialId">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
         <div>
-          <label class="field-label">Service</label>
+          <label class="field-label"><?php echo htmlspecialchars(__("dash.service")); ?></label>
           <input type="text" name="service_name" id="editServiceName" class="field-input" required>
         </div>
         <div style="margin-top:12px;">
-          <label class="field-label">Username / Email</label>
+          <label class="field-label"><?php echo htmlspecialchars(__("dash.username")); ?> / Email</label>
           <input type="text" name="username" id="editUsername" class="field-input" required>
         </div>
         <div style="margin-top:12px;">
-          <label class="field-label">Password <span style="font-weight:400;color:var(--fg-muted)">(leave blank to keep)</span></label>
+          <label class="field-label"><?php echo htmlspecialchars(__("dash.password")); ?> <span style="font-weight:400;color:var(--fg-muted)"><?php echo htmlspecialchars(__("dash.keep_blank")); ?></span></label>
           <div class="field-row">
             <input type="password" name="password" id="editPassword" class="field-input"
               oninput="updateStrengthIndicator(this.value, 'editPasswordStrength')">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="fillGeneratedPassword('editPassword','editPasswordStrength')">Generate</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="fillGeneratedPassword('editPassword','editPasswordStrength')"><?php echo htmlspecialchars(__("dash.generate")); ?></button>
           </div>
           <span id="editPasswordStrength" style="font-size:12px;color:var(--fg-muted);margin-top:4px;display:block;"></span>
         </div>
         <div style="margin-top:12px;">
-          <label class="field-label">URL</label>
+          <label class="field-label"><?php echo htmlspecialchars(__("dash.url")); ?></label>
           <input type="text" name="url" id="editUrl" class="field-input">
         </div>
         <div style="margin-top:12px;">
-          <label class="field-label">Notes</label>
+          <label class="field-label"><?php echo htmlspecialchars(__("dash.notes")); ?></label>
           <textarea name="notes" id="editNotes" class="field-input"></textarea>
         </div>
       </form>
@@ -371,20 +388,74 @@ $totalCreds = count($credentials);
       <form id="deleteCredentialForm" style="margin-right:auto;">
         <input type="hidden" name="id" id="deleteCredentialId">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES); ?>">
-        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        <button type="submit" class="btn btn-danger btn-sm"><?php echo htmlspecialchars(__("dash.delete")); ?></button>
       </form>
-      <button class="btn btn-secondary" onclick="closeCredentialModal()">Close</button>
-      <button class="btn btn-primary" style="width:auto;" onclick="changeModalMode('edit')">Edit</button>
+      <button class="btn btn-secondary" onclick="closeCredentialModal()"><?php echo htmlspecialchars(__("dash.close")); ?></button>
+      <button class="btn btn-primary" style="width:auto;" onclick="changeModalMode('edit')"><?php echo htmlspecialchars(__("dash.edit")); ?></button>
     </div>
     <div class="modal-footer hidden" id="editFooter">
       <button class="btn btn-secondary" onclick="changeModalMode('view')">← Back</button>
-      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('editCredentialForm').requestSubmit()">Save Changes</button>
+      <button class="btn btn-primary" style="width:auto;" onclick="document.getElementById('editCredentialForm').requestSubmit()"><?php echo htmlspecialchars(__("dash.save_changes")); ?></button>
     </div>
   </div>
 </div>
 
+<!-- WEAK PASSWORD WARNING MODAL -->
+<div id="weakPwdModal" class="modal-backdrop hidden" onclick="resolveWeakPwd(false)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="modal-header">
+      <h2 style="display:flex;align-items:center;gap:8px;color:var(--danger);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <?php echo htmlspecialchars(__("dash.weak_warning")); ?>
+      </h2>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--fg-secondary);"><?php echo htmlspecialchars(__("dash.weak_warning_body")); ?></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="resolveWeakPwd(false)"><?php echo htmlspecialchars(__("dash.cancel")); ?></button>
+      <button class="btn btn-danger" style="width:auto;" onclick="resolveWeakPwd(true)"><?php echo htmlspecialchars(__("dash.save_anyway")); ?></button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/clipboard.js"></script>
 <script>
 const csrfToken = <?php echo json_encode($csrfToken); ?>;
+const CLIPBOARD_AUTO_CLEAR = <?php echo json_encode($prefs[PREF_KEY_CLIPBOARD_CLEAR] === "1"); ?>;
+const WEAK_PWD_ALERTS = <?php echo json_encode($prefs[PREF_KEY_WEAK_PWD_ALERTS] === "1"); ?>;
+
+// Promise-based weak password confirmation modal
+let _weakPwdResolver = null;
+function confirmWeakPassword() {
+    return new Promise(function (resolve) {
+        _weakPwdResolver = resolve;
+        document.getElementById('weakPwdModal').classList.remove('hidden');
+    });
+}
+function resolveWeakPwd(accepted) {
+    document.getElementById('weakPwdModal').classList.add('hidden');
+    if (_weakPwdResolver) {
+        const r = _weakPwdResolver;
+        _weakPwdResolver = null;
+        r(accepted === true);
+    }
+}
+
+/**
+ * Calcola un punteggio 0-5 della robustezza della password.
+ * Score <= 2 è considerato "debole" per il warning.
+ */
+function computePasswordScore(password) {
+    if (!password) return 0;
+    let score = 0;
+    if (password.length >= 8)  score++;
+    if (password.length >= 12) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+    return score;
+}
 
 function showMessage(message) {
     const box = document.getElementById('globalMessage');
@@ -538,8 +609,8 @@ async function copyModalPassword() {
             currentPassword = data.password;
         }
 
-        await navigator.clipboard.writeText(currentPassword);
-        showMessage('Password copiata');
+        const ok = await ClipboardManager.copyWithAutoClear(currentPassword, CLIPBOARD_AUTO_CLEAR);
+        showMessage(ok ? 'Password copiata' : 'Errore durante la copia');
     } catch (error) {
         showMessage('Errore durante la copia');
     }
@@ -568,6 +639,15 @@ async function updateCredential(event) {
 
     const form = document.getElementById('editCredentialForm');
     const formData = new FormData(form);
+
+    if (WEAK_PWD_ALERTS) {
+        const newPassword = formData.get('password') || '';
+        // Solo se l'utente ha effettivamente inserito una nuova password (campo vuoto = mantieni)
+        if (newPassword !== '' && computePasswordScore(newPassword) <= 2) {
+            const confirmed = await confirmWeakPassword();
+            if (!confirmed) return;
+        }
+    }
 
     try {
         const response = await fetch('credential/update_credential.php', {
@@ -657,10 +737,8 @@ function closeAddModal() {
 
 function openGenerateModal() {
     const pwd = generatePassword(16, true, true, true);
-    navigator.clipboard.writeText(pwd).then(function() {
-        showMessage('Generated: ' + pwd + ' (copied)');
-    }).catch(function() {
-        showMessage('Generated: ' + pwd);
+    ClipboardManager.copyWithAutoClear(pwd, CLIPBOARD_AUTO_CLEAR).then(function (ok) {
+        showMessage(ok ? 'Generated: ' + pwd + ' (copied)' : 'Generated: ' + pwd);
     });
 }
 
@@ -687,6 +765,14 @@ async function addCredential(event) {
 
     const form = document.getElementById('addCredentialForm');
     const formData = new FormData(form);
+
+    if (WEAK_PWD_ALERTS) {
+        const password = formData.get('password') || '';
+        if (computePasswordScore(password) <= 2) {
+            const confirmed = await confirmWeakPassword();
+            if (!confirmed) return;
+        }
+    }
 
     try {
         const response = await fetch('credential/add_credential.php', { method: 'POST', body: formData });
@@ -715,6 +801,9 @@ async function addCredential(event) {
         newRow.setAttribute('data-url', formData.get('url') || '');
         newRow.setAttribute('data-notes', formData.get('notes') || '');
         newRow.innerHTML = `
+            <input type="checkbox" class="select-checkbox" data-id="${data.id}"
+              style="display:${selectModeActive ? 'block' : 'none'};width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:var(--accent);"
+              onclick="event.stopPropagation();updateSelectionCount()">
             <div class="cred-avatar" style="background:${color}1A;color:${color};">${escapeHtml(initial)}</div>
             <div class="cred-info">
                 <div class="cred-service">${escapeHtml(serviceName)}</div>
@@ -929,74 +1018,87 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Autofill toggle persistence.
-// Strategia a due livelli:
-//   1. localStorage — immediato, funziona anche senza estensione installata.
-//   2. postMessage bridge → content script → chrome.storage.local (fonte autoritativa).
-// Al caricamento legge subito localStorage; se il content script risponde,
-// aggiorna il toggle E risincronizza localStorage.
-// Al cambio toggle salva SEMPRE in localStorage E invia km_set_setting.
-(function() {
-    const AUTOFILL_KEY = "km_autofill_enabled";
+</script>
 
-    function readLocalStorage() {
-        try {
-            const val = localStorage.getItem(AUTOFILL_KEY);
-            return val === null ? true : val !== "false";
-        } catch (e) {
-            return true;
-        }
-    }
+<script src="../assets/js/multi-select.js"></script>
+<script>
+let selectModeActive = false;
 
-    function writeLocalStorage(enabled) {
-        try {
-            localStorage.setItem(AUTOFILL_KEY, String(enabled));
-        } catch (e) { /* storage non disponibile */ }
-    }
+function toggleSelectMode() {
+    selectModeActive = !selectModeActive;
+    const container = document.getElementById('credentialsTableBody');
+    const btn       = document.getElementById('selectModeBtn');
+    const bar       = document.getElementById('selectionBar');
+    const checkboxes = container.querySelectorAll('.select-checkbox');
 
-    function initAutofillToggle() {
-        const toggle = document.getElementById("autofillToggle");
-        if (!toggle) return;
-
-        // Applica subito lo stato da localStorage (nessuna race condition)
-        toggle.checked = readLocalStorage();
-
-        // Imposta il listener PRIMA di inviare il messaggio
-        const messageListener = function(event) {
-            if (event.origin !== window.location.origin) return;
-            if (!event.data || event.data.type !== "km_setting_value") return;
-            if (event.data.key !== AUTOFILL_KEY) return;
-
-            const enabled = event.data.value === undefined ? true : Boolean(event.data.value);
-            toggle.checked = enabled;
-            writeLocalStorage(enabled); // mantieni localStorage sincronizzato
-
-            window.removeEventListener("message", messageListener);
-        };
-        window.addEventListener("message", messageListener);
-
-        // Chiedi il valore autoritativo al content script (se l'estensione è installata)
-        window.postMessage({ type: "km_get_setting", key: AUTOFILL_KEY }, window.location.origin);
-
-        toggle.addEventListener("change", function() {
-            const enabled = this.checked;
-            writeLocalStorage(enabled); // persisti subito, indipendentemente dall'estensione
-            window.postMessage({ type: "km_set_setting", key: AUTOFILL_KEY, value: enabled }, window.location.origin);
-
-            const msg = document.getElementById("settingsMessage");
-            if (msg) {
-                msg.textContent = enabled ? "Autofill enabled" : "Autofill disabled";
-                setTimeout(function() { msg.textContent = ""; }, 2000);
-            }
-        });
-    }
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initAutofillToggle);
+    if (selectModeActive) {
+        checkboxes.forEach(function(cb) { cb.style.display = 'block'; });
+        btn.textContent = 'Cancel';
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-danger');
+        bar.style.display = 'flex';
     } else {
-        initAutofillToggle();
+        checkboxes.forEach(function(cb) { cb.style.display = 'none'; cb.checked = false; });
+        btn.textContent = 'Select';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-secondary');
+        bar.style.display = 'none';
+        updateSelectionCount();
     }
-})();
+}
+
+function updateSelectionCount() {
+    const container = document.getElementById('credentialsTableBody');
+    const ids       = MultiSelect.getSelectedIds(container);
+    document.getElementById('selectionCount').textContent = ids.length + ' selected';
+    document.getElementById('bulkDeleteBtn').disabled = !MultiSelect.isValidSelectionForDelete(ids);
+}
+
+async function bulkDeleteSelected() {
+    const container = document.getElementById('credentialsTableBody');
+    const ids       = MultiSelect.getSelectedIds(container);
+
+    if (!MultiSelect.isValidSelectionForDelete(ids)) {
+        showMessage('Select at least one credential');
+        return;
+    }
+
+    if (!confirm('Delete ' + ids.length + ' credential' + (ids.length > 1 ? 's' : '') + '?')) return;
+
+    const payload = MultiSelect.buildBulkDeletePayload(ids, csrfToken);
+
+    try {
+        const response = await fetch('credential/bulk_delete_credentials.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        let data;
+        try { data = JSON.parse(await response.text()); }
+        catch { data = { success: false, message: 'Invalid server response' }; }
+
+        if (!data.success) {
+            showMessage(data.message || 'Delete error');
+            return;
+        }
+
+        ids.forEach(function(id) {
+            const row = document.querySelector('.credential-row[data-id="' + id + '"]');
+            if (row) row.remove();
+        });
+
+        showMessage(data.message || 'Credentials deleted');
+        toggleSelectMode();
+
+        if (!document.querySelector('#credentialsTableBody .credential-row')) {
+            document.getElementById('credentialsTableBody').innerHTML =
+                '<div class="empty-credentials-msg" style="padding:32px;text-align:center;color:var(--fg-muted);font-size:13px;">No credentials yet. Add your first one above.</div>';
+        }
+    } catch {
+        showMessage('Error during deletion');
+    }
+}
 </script>
 
 <!-- SECURITY AUDIT MODAL -->
