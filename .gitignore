@@ -28,3 +28,9 @@ requirement/mail_config.php
 
 # Logs
 *.log
+
+.claude/
+
+CLAUDE.md
+
+KeyManager.pen
