@@ -1,9 +1,30 @@
+# Python
 venv/
 __pycache__/
 *.pyc
+
+# macOS
 .DS_Store
+
+# Browser extension build artifacts
 browser-extension.pem
 browser-extension.crx
+
+# Node
 node_modules/
+
+# Test coverage reports
+coverage/
+browser-extension/coverage/
+*.lcov
+
 # Credenziali SMTP — non tracciare in git
 requirement/mail_config.php
+
+# Editor / IDE
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
