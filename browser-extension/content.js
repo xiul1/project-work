@@ -3,6 +3,22 @@
 // Autofill intelligente e autonomo delle credenziali
 // ===========================
 
+// --- Bootstrap helper condivisi ---
+// Nel browser i content_scripts caricano shared.js prima di content.js (vedi
+// manifest.json), quindi le funzioni kmNormalizeHost / kmRootDomain /
+// kmHostFromCredential / kmCredentialMatchScore / kmGetMatchingCredentials
+// sono già disponibili nello stesso isolated world.
+// In Jest carichiamo esplicitamente shared.js per esporre gli helper.
+/* istanbul ignore next */
+if (typeof require !== "undefined" && typeof module !== "undefined") {
+  const shared = require("./shared.js");
+  Object.keys(shared).forEach((key) => {
+    if (typeof globalThis[key] === "undefined") {
+      globalThis[key] = shared[key];
+    }
+  });
+}
+
 // --- Costanti ---
 
 const KM_OVERLAY_ID = "km-autofill-overlay";
@@ -36,55 +52,8 @@ let kmDomObserver = null;
 // ===========================
 // UTILITÀ URL E DOMINIO
 // ===========================
-
-/**
- * Normalizza un URL o hostname in un hostname senza "www.".
- * Esempio: "https://www.Google.com/path" → "google.com"
- */
-function kmNormalizeHost(value) {
-  const raw = String(value || "").trim().toLowerCase();
-  if (!raw) return "";
-
-  try {
-    const parsed = new URL(raw.includes("://") ? raw : "https://" + raw);
-    return parsed.hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return raw.replace(/^www\./, "").toLowerCase();
-  }
-}
-
-/**
- * Ritorna il dominio radice (es. "sub.google.com" → "google.com").
- */
-function kmRootDomain(host) {
-  const normalized = kmNormalizeHost(host);
-  if (!normalized) return "";
-  const parts = normalized.split(".");
-  return parts.length <= 2 ? normalized : parts.slice(-2).join(".");
-}
-
-/**
- * Estrae l'hostname da una credenziale (priorità: url → service_name).
- */
-function kmHostFromCredential(credential) {
-  const urlHost = kmNormalizeHost(credential.url || "");
-  if (urlHost) return urlHost;
-
-  const service = String(credential.service_name || "");
-  const match = service.match(/([a-z0-9.-]+\.[a-z]{2,})/i);
-  return match ? kmNormalizeHost(match[1]) : "";
-}
-
-/**
- * Calcola quanto bene una credenziale corrisponde alla pagina corrente.
- * 2 = match esatto sull'host, 1 = stesso dominio radice, 0 = nessun match.
- */
-function kmCredentialMatchScore(credentialHost, pageHost) {
-  if (!credentialHost || !pageHost) return 0;
-  if (credentialHost === pageHost) return 2;
-  if (kmRootDomain(credentialHost) === kmRootDomain(pageHost)) return 1;
-  return 0;
-}
+// kmNormalizeHost, kmRootDomain, kmHostFromCredential, kmCredentialMatchScore
+// vivono in shared.js e sono già disponibili in questo scope.
 
 
 // ===========================
@@ -271,33 +240,11 @@ async function kmGetCachedCredentials() {
 
 /**
  * Trova e ordina le credenziali che corrispondono alla pagina corrente.
- * Criteri di match: host esatto (punteggio 2) > dominio radice (punteggio 1).
+ * Delega a kmGetMatchingCredentials (shared.js) per la logica di matching.
  */
 async function kmGetSuggestionsForPage() {
-  const host = kmNormalizeHost(window.location.hostname);
-  if (!host) return [];
-
   const credentials = await kmGetCachedCredentials();
-  const matched = [];
-
-  credentials.forEach((credential) => {
-    const credHost = kmHostFromCredential(credential);
-    const score = kmCredentialMatchScore(credHost, host);
-    if (score <= 0) return;
-
-    matched.push({
-      ...credential,
-      match_type: score === 2 ? "exact_host" : "root_domain"
-    });
-  });
-
-  // Ordina: match esatto prima, poi dominio radice
-  matched.sort((a, b) => {
-    if (a.match_type === b.match_type) return 0;
-    return a.match_type === "exact_host" ? -1 : 1;
-  });
-
-  return matched;
+  return kmGetMatchingCredentials(window.location.hostname, credentials);
 }
 
 

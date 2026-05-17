@@ -1,6 +1,9 @@
 // ===========================
 // KEYMANAGER - Popup Script
 // ===========================
+// NOTA: gli helper di matching (kmNormalizeHost, kmRootDomain,
+// kmHostFromCredential, kmCredentialMatchScore, kmGetMatchingCredentials)
+// sono forniti da shared.js, caricato in popup.html prima di questo file.
 
 const KM_BASE_URL      = "http://localhost/project-work";
 const KM_LOGIN_URL     = KM_BASE_URL + "/auth/login.php";
@@ -13,23 +16,15 @@ const AVATAR_COLORS = [
   "#7B68EE", "#FF6B35", "#333333", "#9B59B6"
 ];
 
-let activeTabId    = null;
-let activeTabUrl   = "";
-let allCredentials = [];
+let activeTabId        = null;
+let activeTabUrl       = "";
+let siteCredentials    = []; // credenziali matching del sito corrente, ordinate
 
 
 // ───────────────── UI UTILS ─────────────────
 
 function setMessage(text) {
   document.getElementById("messageText").textContent = text || "";
-}
-
-function normalizeDomainFromUrl(rawUrl) {
-  try {
-    return new URL(rawUrl).hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return "";
-  }
 }
 
 function showView(view) {
@@ -61,6 +56,10 @@ function avatarLetter(name) {
   return (name || "?").charAt(0).toUpperCase();
 }
 
+function credentialLabel(cred) {
+  return cred.service_name || cred.site || "-";
+}
+
 
 // ───────────────── SESSION CHECK ─────────────────
 
@@ -78,7 +77,7 @@ async function checkLoginStatus() {
 
 // ───────────────── SITE CARD ─────────────────
 
-function updateSiteCard(domain, cred) {
+function updateSiteCard(domain, matchingCredentials) {
   const nameEl   = document.getElementById("siteName");
   const subEl    = document.getElementById("siteEmail");
   const avatarEl = document.getElementById("siteAvatar");
@@ -93,66 +92,77 @@ function updateSiteCard(domain, cred) {
     return;
   }
 
-  if (cred) {
-    nameEl.textContent        = cred.site || domain;
-    subEl.textContent         = cred.username || "";
-    avatarEl.textContent      = avatarLetter(cred.site || domain);
-    avatarEl.style.background = avatarColor(cred.site || domain);
-    autofill.disabled         = false;
-  } else {
+  if (!matchingCredentials || matchingCredentials.length === 0) {
     nameEl.textContent        = domain;
     subEl.textContent         = "Nessuna credenziale trovata";
     avatarEl.textContent      = avatarLetter(domain);
     avatarEl.style.background = avatarColor(domain);
     autofill.disabled         = true;
+    return;
   }
+
+  const top = matchingCredentials[0];
+  const labelTop = credentialLabel(top);
+  const extraCount = matchingCredentials.length - 1;
+
+  nameEl.textContent        = labelTop;
+  subEl.textContent         = extraCount > 0
+    ? (top.username || "") + " · +" + extraCount + " altre"
+    : (top.username || "");
+  avatarEl.textContent      = avatarLetter(labelTop);
+  avatarEl.style.background = avatarColor(labelTop);
+  autofill.disabled         = false;
 }
 
 
-// ───────────────── RECENT LIST ─────────────────
+// ───────────────── SITE CREDENTIALS LIST ─────────────────
 
 const COPY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`;
 
-function buildRecentList(credentials, query) {
-  const list = document.getElementById("recentList");
+function buildSiteCredentialsList(credentials, query) {
+  const list = document.getElementById("siteCredentialsList");
   list.innerHTML = "";
 
-  const filtered = query
-    ? credentials.filter(c => {
-        const q = query.toLowerCase();
-        return (c.site || "").toLowerCase().includes(q) ||
-               (c.username || "").toLowerCase().includes(q);
+  const q = (query || "").trim().toLowerCase();
+  const filtered = q
+    ? credentials.filter((c) => {
+        const label = credentialLabel(c).toLowerCase();
+        const user = (c.username || "").toLowerCase();
+        return label.includes(q) || user.includes(q);
       })
     : credentials;
 
-  const items = filtered.slice(0, 4);
-
-  if (items.length === 0) {
+  if (filtered.length === 0) {
     const empty = document.createElement("div");
     empty.className = "km-recent-item";
     empty.style.color = "#888888";
     empty.style.justifyContent = "center";
     empty.style.cursor = "default";
-    empty.textContent = query ? "Nessun risultato" : "Nessuna credenziale in cache";
+    empty.textContent = credentials.length === 0
+      ? "Nessuna credenziale per questo sito"
+      : "Nessun risultato";
     list.appendChild(empty);
     return;
   }
 
-  items.forEach(cred => {
+  filtered.forEach((cred) => {
     const row = document.createElement("div");
     row.className = "km-recent-item";
+    row.title = "Click per inserire queste credenziali";
+
+    const label = credentialLabel(cred);
 
     const av = document.createElement("div");
     av.className = "km-avatar";
-    av.textContent = avatarLetter(cred.site || "");
-    av.style.background = avatarColor(cred.site || "");
+    av.textContent = avatarLetter(label);
+    av.style.background = avatarColor(label);
 
     const info = document.createElement("div");
     info.className = "km-recent-info";
 
     const name = document.createElement("div");
     name.className = "km-recent-name";
-    name.textContent = cred.site || "-";
+    name.textContent = label;
 
     const sub = document.createElement("div");
     sub.className = "km-recent-sub";
@@ -160,6 +170,11 @@ function buildRecentList(credentials, query) {
 
     info.appendChild(name);
     info.appendChild(sub);
+
+    // Click sulla riga → autofill di QUESTA specifica credenziale
+    row.addEventListener("click", () => {
+      triggerAutofill(cred);
+    });
 
     const copyBtn = document.createElement("button");
     copyBtn.className = "km-copy-btn";
@@ -201,19 +216,14 @@ async function refreshActiveTab() {
 async function refreshStatus() {
   await refreshActiveTab();
 
-  const domain = normalizeDomainFromUrl(activeTabUrl);
+  const domain = kmNormalizeHost(activeTabUrl);
   const cache  = await storageGet(["km_credentials_cache"]);
-  allCredentials = Array.isArray(cache.km_credentials_cache) ? cache.km_credentials_cache : [];
+  const allCredentials = Array.isArray(cache.km_credentials_cache) ? cache.km_credentials_cache : [];
 
-  const matched = domain
-    ? allCredentials.find(c => {
-        const site = (c.site || "").toLowerCase();
-        return site.includes(domain) || domain.includes(site);
-      })
-    : null;
+  siteCredentials = kmGetMatchingCredentials(domain, allCredentials);
 
-  updateSiteCard(domain, matched || null);
-  buildRecentList(allCredentials, "");
+  updateSiteCard(domain, siteCredentials);
+  buildSiteCredentialsList(siteCredentials, "");
 }
 
 
@@ -298,17 +308,13 @@ async function syncFromDashboard() {
 
 // ───────────────── AUTOFILL ─────────────────
 
-async function triggerAutofill() {
+async function triggerAutofill(specificCred) {
   if (!activeTabId) {
     setMessage("Nessuna tab attiva.");
     return;
   }
 
-  const domain = normalizeDomainFromUrl(activeTabUrl);
-  const cred   = allCredentials.find(c => {
-    const site = (c.site || "").toLowerCase();
-    return site.includes(domain) || domain.includes(site);
-  });
+  const cred = specificCred || siteCredentials[0];
 
   if (!cred) {
     setMessage("Nessuna credenziale per questo sito.");
@@ -339,12 +345,10 @@ async function init() {
 
     document.getElementById("syncBtn").addEventListener("click", syncFromDashboard);
     document.getElementById("settingsBtn").addEventListener("click", () => openTab(KM_SETTINGS_URL));
-    document.getElementById("autofillBtn").addEventListener("click", triggerAutofill);
-    document.getElementById("openVaultBtn").addEventListener("click", () => openTab(KM_DASHBOARD_URL));
-    document.getElementById("addNewBtn").addEventListener("click", () => openTab(KM_DASHBOARD_URL));
-    document.getElementById("generateBtn").addEventListener("click", () => openTab(KM_DASHBOARD_URL));
+    document.getElementById("autofillBtn").addEventListener("click", () => triggerAutofill());
+
     document.getElementById("searchInput").addEventListener("input", (e) => {
-      buildRecentList(allCredentials, e.target.value);
+      buildSiteCredentialsList(siteCredentials, e.target.value);
     });
   } else {
     showView("notLoggedIn");
